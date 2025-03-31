@@ -1,0 +1,14 @@
+dill
+bs4
+tqdm
+google-genai
+openai
+torch
+regex
+numpy
+scikit-learn
+flask
+sentence_transformers
+Levenshtein
+python-dateutil
+anthropic
