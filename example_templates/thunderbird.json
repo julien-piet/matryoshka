@@ -1,0 +1,72 @@
+[
+    {
+        "template": [
+            {"value": "-", "type": "VARIABLE", "regex": "\\S+"},
+            {"value": "1132575462", "type": "VARIABLE", "regex": "\\d+"},
+            {"value": "2005.11.21", "type": "VARIABLE", "regex": "\\d{4}\\.\\d{2}\\.\\d{2}"},
+            {"value": "dn30", "type": "VARIABLE", "regex": "\\S+"},
+            {"value": "Nov 21 04:17:42", "type": "VARIABLE", "regex": "\\w{3}\\s+\\d{1,2}\\s+\\d{2}:\\d{2}:\\d{2}"},
+            {"value": "dn30/dn30", "type": "VARIABLE", "regex": "\\S+"},
+            {"value": "kernel:", "type": "CONSTANT"},
+            {"value": "[KERNEL_IB][ib_mad_dispatch][", "type": "CONSTANT"},
+            {"value": "/mnt_projects/sysapps/src/ib/topspin/topspin-src-3.2.0-16/ib/ts_api_ng/mad/obj_host_amd64_custom1_rhel4/ts_ib_mad/mad_filter.c", "type": "VARIABLE", "regex": "\\S+"},
+            {"value": ":", "type": "CONSTANT"},
+            {"value": "292", "type": "VARIABLE", "regex": "\\d+"},
+            {"value": "]mad_process failed (", "type": "CONSTANT"},
+            {"value": "0", "type": "VARIABLE", "regex": "\\d+"},
+            {"value": ") for", "type": "CONSTANT"},
+            {"value": "InfiniHost0", "type": "VARIABLE", "regex": "\\S+"},
+            {"value": "port", "type": "CONSTANT"},
+            {"value": "1", "type": "VARIABLE", "regex": "\\d+"},
+            {"value": "QPN", "type": "CONSTANT"},
+            {"value": "0", "type": "VARIABLE", "regex": "\\d+"},
+            {"value": "(class", "type": "CONSTANT"},
+            {"value": "0x81", "type": "VARIABLE", "regex": "0x[0-9a-fA-F]+"},
+            {"value": ", aid", "type": "CONSTANT"},
+            {"value": "0x0011", "type": "VARIABLE", "regex": "0x[0-9a-fA-F]+"},
+            {"value": ")", "type": "CONSTANT"}
+        ],
+        "examples": [
+            "- 1132575462 2005.11.21 dn30 Nov 21 04:17:42 dn30/dn30 kernel: [KERNEL_IB][ib_mad_dispatch][/mnt_projects/sysapps/src/ib/topspin/topspin-src-3.2.0-16/ib/ts_api_ng/mad/obj_host_amd64_custom1_rhel4/ts_ib_mad/mad_filter.c:292]mad_process failed (0) for InfiniHost0 port 1 QPN 0 (class 0x81, aid 0x0011)",
+            "- 1135604219 2005.12.26 bn971 Dec 26 05:36:59 bn971/bn971 kernel: [KERNEL_IB][ib_mad_dispatch][/mnt_projects/sysapps/src/ib/topspin/topspin-src-3.2.0-16/ib/ts_api_ng/mad/obj_host_amd64_custom1_rhel4/ts_ib_mad/mad_filter.c:292]mad_process failed (0) for InfiniHost0 port 1 QPN 0 (class 0x81, aid 0x0011)",
+            "- 1135095197 2005.12.20 dn609 Dec 20 08:13:17 dn609/dn609 kernel: [KERNEL_IB][ib_mad_dispatch][/mnt_projects/sysapps/src/ib/topspin/topspin-src-3.2.0-16/ib/ts_api_ng/mad/obj_host_amd64_custom1_rhel4/ts_ib_mad/mad_filter.c:292]mad_process failed (0) for InfiniHost0 port 1 QPN 0 (class 0x81, aid 0x0011)",
+            "- 1135243588 2005.12.22 an690 Dec 22 01:26:28 an690/an690 kernel: [KERNEL_IB][ib_mad_dispatch][/mnt_projects/sysapps/src/ib/topspin/topspin-src-3.2.0-16/ib/ts_api_ng/mad/obj_host_amd64_custom1_rhel4/ts_ib_mad/mad_filter.c:292]mad_process failed (0) for InfiniHost0 port 1 QPN 0 (class 0x81, aid 0x0011)",
+            "- 1135318780 2005.12.22 an690 Dec 22 22:19:40 an690/an690 kernel: [KERNEL_IB][ib_mad_dispatch][/mnt_projects/sysapps/src/ib/topspin/topspin-src-3.2.0-16/ib/ts_api_ng/mad/obj_host_amd64_custom1_rhel4/ts_ib_mad/mad_filter.c:292]mad_process failed (0) for InfiniHost0 port 1 QPN 0 (class 0x81, aid 0x0011)"
+        ],
+        "description": "These log lines record InfiniBand kernel Management Datagram (MAD) process failures with detailed error information.",
+        "format": "<Label> <Timestamp> <Date> <User> <Datetime_Readable> <Location> kernel: [KERNEL_IB][ib_mad_dispatch][<SourcePath>:<LineNumber>]mad_process failed (<ErrorCode>) for <DeviceName> port <PortNum> QPN <QPNum> (class <ClassID>, aid <AidCode>)",
+        "key_values": [
+            "port <PortNum>",
+            "QPN <QPNum>",
+            "class <ClassID>",
+            "aid <AidCode>"
+        ],
+        "constants": [
+            "kernel:",
+            "[KERNEL_IB][ib_mad_dispatch][",
+            ":",
+            "]mad_process failed (",
+            ") for",
+            "port",
+            "QPN",
+            "(class",
+            ", aid",
+            ")"
+        ],
+        "variables": [
+            "<Label>: Log label (-)",
+            "<UnixTime>: Unix timestamp (1132575462)",
+            "<User>: System user identifier (dn30)",
+            "<Datetime_Readable>: Human readable timestamp (Nov 21 04:17:42)",
+            "<Location>: System location identifier (dn30/dn30)",
+            "<SourcePath>: Source code file path (/mnt_projects/sysapps/src/ib/topspin/topspin-src-3.2.0-16/ib/ts_api_ng/mad/obj_host_amd64_custom1_rhel4/ts_ib_mad/mad_filter.c)",
+            "<LineNumber>: Line number in the source code file (292)",
+            "<ErrorCode>: Error code number (0)",
+            "<DeviceName>: InfiniBand device name (InfiniHost0)",
+            "<PortNum>: Port number (1)",
+            "<QPNum>: Queue Pair Number (0)",
+            "<ClassID>: MAD class ID in hex (0x81)",
+            "<AidCode>: Attribute ID in hex (0x0011)"
+        ]
+    }
+]

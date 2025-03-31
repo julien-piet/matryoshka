@@ -1,0 +1,42 @@
+[
+    {
+        "template": [
+            {"value": "Jul  4 10:26:46", "type": "VARIABLE", "regex": "\\w{3}\\s+\\d{1,2}\\s+\\d{2}:\\d{2}:\\d{2}"},
+            {"value": "authorMacBook-Pro", "type": "VARIABLE", "regex": "\\S+"},
+            {"value": "symptomsd", "type": "VARIABLE", "regex": "\\S+"},
+            {"value": "[", "type": "CONSTANT"},
+            {"value": "215", "type": "VARIABLE", "regex": "\\d+"},
+            {"value": "]:", "type": "CONSTANT"},
+            {"value": "__", "type": "CONSTANT"},
+            {"value": "73", "type": "VARIABLE", "regex": "\\d+"},
+            {"value": "-[NetworkAnalyticsEngine observeValueForKeyPath:ofObject:change:context:]_block_invoke unexpected switch value", "type": "CONSTANT"},
+            {"value": "2", "type": "VARIABLE", "regex": "\\d+"}
+        ],
+        "examples": [
+            "Jul  4 10:26:46 authorMacBook-Pro symptomsd[215]: __73-[NetworkAnalyticsEngine observeValueForKeyPath:ofObject:change:context:]_block_invoke unexpected switch value 2",
+            "Jul  8 04:16:18 calvisitor-10-105-161-176 symptomsd[215]: __73-[NetworkAnalyticsEngine observeValueForKeyPath:ofObject:change:context:]_block_invoke unexpected switch value 2",
+            "Jul  7 13:38:15 authorMacBook-Pro symptomsd[215]: __73-[NetworkAnalyticsEngine observeValueForKeyPath:ofObject:change:context:]_block_invoke unexpected switch value 2",
+            "Jul  3 16:25:52 authorMacBook-Pro symptomsd[215]: __73-[NetworkAnalyticsEngine observeValueForKeyPath:ofObject:change:context:]_block_invoke unexpected switch value 2",
+            "Jul  7 13:42:28 authorMacBook-Pro symptomsd[215]: __73-[NetworkAnalyticsEngine observeValueForKeyPath:ofObject:change:context:]_block_invoke unexpected switch value 2"
+        ],
+        "description": "These log lines record unexpected switch value errors from the MacOS NetworkAnalyticsEngine within the symptoms daemon.",
+        "format": "<Timestamp> <Hostname> <Process>[<PID>]: __<ID>-[NetworkAnalyticsEngine observeValueForKeyPath:ofObject:change:context:]_block_invoke unexpected switch value <Value>",
+        "key_values": [
+            "value <Value>"
+        ],
+        "constants": [
+            "[",
+            "]:",
+            "__",
+            "-[NetworkAnalyticsEngine observeValueForKeyPath:ofObject:change:context:]_block_invoke unexpected switch value"
+        ],
+        "variables": [
+            "<Timestamp>: System timestamp (Jul  4 10:26:46)",
+            "<Hostname>: System hostname (authorMacBook-Pro)",
+            "<Process>: Process name (symptomsd)",
+            "<PID>: Process ID (215)",
+            "<ID>: Block identifier (73)",
+            "<Value>: Unexpected switch value (2)"
+        ]
+    }
+]

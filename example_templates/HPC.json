@@ -1,0 +1,43 @@
+[
+    {
+        "template": [
+            {"value": "287264", "type": "VARIABLE", "regex": "\\d+"},
+            {"value": "4059", "type": "VARIABLE", "regex": "\\S+"},
+            {"value": "boot_cmd", "type": "VARIABLE", "regex": "\\S+"},
+            {"value": "new", "type": "VARIABLE", "regex": "\\S+"},
+            {"value": "1134670677", "type": "VARIABLE", "regex": "[0-9\\.]{2,}"},
+            {"value": "1", "type": "VARIABLE", "regex": "(0|1|-1)"},
+            {"value": "Targeting domains:node-D", "type": "CONSTANT"},
+            {"value": "3", "type": "VARIABLE", "regex": "\\d+"},
+            {"value": "and nodes:node-[", "type": "CONSTANT"},
+            {"value": "104", "type": "VARIABLE", "regex": "\\d+"},
+            {"value": "-", "type": "CONSTANT"},
+            {"value": "127", "type": "VARIABLE", "regex": "\\d+"},
+            {"value": "] child of command", "type": "CONSTANT"},
+            {"value": "4049", "type": "VARIABLE", "regex": "\\d+"}
+        ],
+        "examples": [
+            "287264 4059 boot_cmd new 1134670677 1 Targeting domains:node-D3 and nodes:node-[104-127] child of command 4049",
+            "287265 4060 boot_cmd new 1134670677 1 Targeting domains:node-D3 and nodes:node-[96-103] child of command 4049",
+            "287275 4061 boot_cmd new 1134670688 1 Targeting domains:node-D4 and nodes:node-[136-159] child of command 4050",
+            "287276 4062 boot_cmd new 1134670688 1 Targeting domains:node-D4 and nodes:node-[128-135] child of command 4050",
+            "287288 4063 boot_cmd new 1134670699 1 Targeting domains:node-D5 and nodes:node-[168-191] child of command 4051"
+        ],
+        "description": "These log lines record HPC (High Performance Computing) boot commands targeting specific node domains and ranges, tracking parent-child command relationships.",
+        "format": "<JobID> <CmdID> <CmdType> <Status> <Timestamp> <Flag> Targeting domains:node-D<Domain> and nodes:node-[<StartNode>-<EndNode>] child of command <ParentCmd>",
+        "key_values": ["There are no key-value pairs"],
+        "constants": ["Targeting domains:node-D", "and nodes:node-[", "-", "] child of command"],
+        "variables": [
+            "<JobID>: Sequential job identifier number (287264)",
+            "<CmdID>: Command identifier (4059)",
+            "<CmdType>: Type of command (boot_cmd)",
+            "<Status>: Status of the command (new)",
+            "<Timestamp>: Unix timestamp of the command (1134670677)",
+            "<Flag>: Success flag (1)",
+            "<Domain>: Node domain number (3)",
+            "<StartNode>: First node in range (104)",
+            "<EndNode>: Last node in range (127)",
+            "<ParentCmd>: Parent command identifier (4049)"
+        ]
+    }
+]

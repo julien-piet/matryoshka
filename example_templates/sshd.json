@@ -1,0 +1,36 @@
+[
+    {
+        "template": [
+            {"value": "Jan 23 18:03:12", "type": "VARIABLE", "regex": "\\w{3}\\s+\\d{1,2}\\s+\\d{2}:\\d{2}:\\d{2}"},
+            {"value": "red5k", "type": "VARIABLE", "regex": "\\S+"},
+            {"value": "sshd", "type": "VARIABLE", "regex": "\\S+"},
+            {"value": "[", "type": "CONSTANT"},
+            {"value": "1752504", "type": "VARIABLE", "regex": "\\d+"},
+            {"value": "]:", "type": "CONSTANT"},
+            {"value": "Received disconnect from", "type": "CONSTANT"},
+            {"value": "10.44.57.183", "type": "VARIABLE", "regex": "(\\d+\\.\\d+\\.\\d+\\.\\d+)|([0-9a-fA-F:]+)"},
+            {"value": "port", "type": "CONSTANT"},
+            {"value": "54142", "type": "VARIABLE", "regex": "\\d+"},
+            {"value": ":11: disconnected by user", "type": "CONSTANT"}
+        ],
+        "examples": [
+            "Jan 23 18:03:12 red5k sshd[1752504]: Received disconnect from 10.44.57.183 port 54142:11: disconnected by user",
+            "Apr 13 05:07:36 red5k sshd[762392]: Received disconnect from 192.35.2.12 port 28394:11: disconnected by user",
+            "Mar 08 12:45:23 red5k sshd[892147]: Received disconnect from 172.16.89.201 port 49213:11: disconnected by user",
+            "Jun 19 21:33:09 red5k sshd[234891]: Received disconnect from 10.22.144.92 port 33782:11: disconnected by user",
+            "Sep 04 09:15:47 red5k sshd[445672]: Received disconnect from 192.168.45.173 port 52914:11: disconnected by user"
+        ],
+        "description": "These log lines record SSH disconnection events, capturing when users disconnect from an SSH session along with the source IP and port information.",
+        "format": "<Timestamp> <Hostname> <Service>[<PID>]: Received disconnect from <IP> port <Port>:11: disconnected by user",
+        "key_values": ["port <Port>"],
+        "constants": ["[", "]: ", "Received disconnect from", "port", ":11: disconnected by user"],
+        "variables": [
+            "<Timestamp>: Date and time of the disconnection (Jan 23 18:03:12)",
+            "<Hostname>: The name of the host system (red5k)",
+            "<Service>: The service handling the connection (sshd)",
+            "<PID>: Process ID of the SSH daemon (1752504)",
+            "<IP>: IP address of the client that disconnected (10.44.57.183)",
+            "<Port>: Port number of the client connection (54142)"
+        ]
+    }
+]

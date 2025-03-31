@@ -1,0 +1,43 @@
+[
+    {
+        "template": [
+            {"value": "Sep  7 05:06:00", "type": "VARIABLE", "regex": "\\w{3}\\s+\\d{1,2}\\s+\\d{2}:\\d{2}:\\d{2}"},
+            {"value": "nsednev-rhevm-smoketests-3-5", "type": "VARIABLE", "regex": "\\S+"},
+            {"value": "dhclient", "type": "CONSTANT"},
+            {"value": "[", "type": "CONSTANT"},
+            {"value": "1429", "type": "VARIABLE", "regex": "\\d+"},
+            {"value": "]:", "type": "CONSTANT"},
+            {"value": "DHCPREQUEST", "type": "VARIABLE", "regex": "[A-Z]+"},
+            {"value": "on", "type": "CONSTANT"},
+            {"value": "eth0", "type": "VARIABLE", "regex": "\\S+"},
+            {"value": "to", "type": "CONSTANT"},
+            {"value": "10.35.28.1", "type": "VARIABLE", "regex": "\\d+\\.\\d+\\.\\d+\\.\\d+"},
+            {"value": "port", "type": "CONSTANT"},
+            {"value": "67", "type": "VARIABLE", "regex": "\\d+"},
+            {"value": "(xid=", "type": "CONSTANT"},
+            {"value": "0x639e9692", "type": "VARIABLE", "regex": "0x[0-9a-f]+"},
+            {"value": ")", "type": "CONSTANT"}
+        ],
+        "examples": [
+            "Sep  7 05:06:00 server-prod-east-1 dhclient[1429]: DHCPREQUEST on eth0 to 10.35.28.1 port 67 (xid=0x639e9692)",
+            "Nov 15 23:14:32 db-worker-2 dhclient[2851]: DHCPREQUEST on eth1 to 192.168.1.254 port 68 (xid=0x47abc123)",
+            "Mar 23 11:09:45 compute-node-5 dhclient[9172]: DHCPREQUEST on enp0s3 to 172.16.0.1 port 67 (xid=0x8def4721)",
+            "Jul  4 03:27:18 storage-backup-3 dhclient[4067]: DHCPREQUEST on bond0 to 10.0.15.254 port 68 (xid=0x91be5432)",
+            "Dec 31 15:52:03 load-balancer-1 dhclient[7823]: DHCPREQUEST on eth2 to 169.254.1.1 port 67 (xid=0x5fa92e8d)"
+        ],
+        "description": "These log lines record DHCP client log entries keeping track of computers requesting to renew their network IP address leases from DHCP servers.",
+        "format": "<Timestamp> <Hostname> dhclient[<PID>]: <DHCPType> on <Interface> to <ServerIP> port <Port> (xid=<TransactionID>)",
+        "key_values": ["xid=<TransactionID>"],
+        "constants": ["dhclient", "[", "]:", "on", "to", "port", "(xid=", ")"],
+        "variables": [
+            "<Timestamp>: System timestamp in MMM DD HH:MM:SS format (Sep  7 05:06:00)",
+            "<Hostname>: Name of the system making the request (nsednev-rhevm-smoketests-3-5)",
+            "<PID>: Process ID of the DHCP client (1429)",
+            "<DHCPType>: Type of DHCP message (DHCPREQUEST)",
+            "<Interface>: Network interface making the request (eth0)",
+            "<ServerIP>: IP address of the DHCP server (10.35.28.1)",
+            "<Port>: UDP port number (67)",
+            "<TransactionID>: Unique transaction identifier (0x639e9692)"
+        ]
+    }
+]

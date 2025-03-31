@@ -1,0 +1,33 @@
+[
+    {
+    "template": [
+        {"value": "081110 151800", "type": "VARIABLE", "regex": "\\d+\\s+\\d+"},
+        {"value": "31", "type": "VARIABLE", "regex": "\\d+"},
+        {"value": "INFO", "type": "VARIABLE", "regex": "[A-Z]+"},
+        {"value": "dfs.FSNamesystem", "type": "VARIABLE", "regex": "\\S+"},
+        {"value": ":", "type": "CONSTANT", "regex": "(0|1|-1)"},
+        {"value": "BLOCK*", "type": "CONSTANT"},
+        {"value": "NameSystem.addStoredBlock:", "type": "CONSTANT"},
+        {"value": "blockMap updated:", "type": "CONSTANT"},
+        {"value": "10.250.10.100", "type": "VARIABLE", "regex": "\\d+\\.\\d+\\.\\d+\\.\\d+"},
+        {"value": ":", "type": "CONSTANT"},
+        {"value": "50010", "type": "VARIABLE", "regex": "\\d+"},
+        {"value": "is added to blk_", "type": "CONSTANT"},
+        {"value": "-5295191152327048185", "type": "VARIABLE", "regex": "-?\\d+"},
+        {"value": "size", "type": "CONSTANT"},
+        {"value": "67108864", "type": "VARIABLE", "regex": "\\d+"}
+    ],
+    "examples": [
+        "081110 151800 31 INFO dfs.FSNamesystem: BLOCK* NameSystem.addStoredBlock: blockMap updated: 10.250.10.100:50010 is added to blk_-5295191152327048185 size 67108864",
+        "081111 074009 26 INFO dfs.FSNamesystem: BLOCK* NameSystem.addStoredBlock: blockMap updated: 10.251.111.209:50010 is added to blk_-4960895816316407247 size 3548021",
+        "081109 232937 31 INFO dfs.FSNamesystem: BLOCK* NameSystem.addStoredBlock: blockMap updated: 10.251.127.47:50010 is added to blk_-7416725384231699070 size 67108864",
+        "081111 105910 33 INFO dfs.FSNamesystem: BLOCK* NameSystem.addStoredBlock: blockMap updated: 10.251.126.22:50010 is added to blk_4147683262894582072 size 67108864",
+        "081111 054431 33 INFO dfs.FSNamesystem: BLOCK* NameSystem.addStoredBlock: blockMap updated: 10.251.38.53:50010 is added to blk_4743592031217577640 size 67108864"
+    ],
+    "description": "These log lines report HDFS block replication activity where DataNodes are reporting their stored blocks to the NameNode for tracking purposes.",
+    "format": "<Timestamp> <PID> <Severity> <Component>: BLOCK* NameSystem.addStoredBlock: blockMap updated: <IP>:<Port> is added to blk_<BlockID> size <BlockSize>",
+    "key_values": ["blk_<BlockID>", "size <BlockSize>"],
+    "constants": [": BLOCK* NameSystem.addStoredBlock: blockMap updated:", ":", "is added to blk_", "size"],
+    "variables": ["<Timestamp>: YYMMDD HHMMSS format (081110 151800)", "<PID>: Process ID number (31)", "<Severity>: Message severity (INFO)", "<Component>: Component that is reporting the log message (dfs.FSNamesystem)", "<IP>: DataNode IP address (10.250.10.100)", "<Port>: DataNode port number (50010)", "<BlockID>: Unique block identifier (-5295191152327048185)", "<BlockSize>: Size in bytes (67108864)"]
+}
+]

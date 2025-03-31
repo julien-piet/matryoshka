@@ -1,0 +1,50 @@
+[
+    {
+        "template": [
+            {"value": "-", "type": "VARIABLE", "regex": "\\S+"},
+            {"value": "1117953058", "type": "VARIABLE", "regex": "\\d+"},
+            {"value": "2005.06.04", "type": "VARIABLE", "regex": "\\d{4}\\.\\d{2}\\.\\d{2}"},
+            {"value": "R20-M1-N8-I", "type": "VARIABLE", "regex": "[0-9A-Z-]+?"},
+            {"value": ":", "type": "CONSTANT"},
+            {"value": "J18-U01", "type": "VARIABLE", "regex": "[0-9A-Z-]+?"},
+            {"value": "2005-06-04-23.30.58.830299", "type": "VARIABLE", "regex": "\\d{4}-\\d{2}-\\d{2}-\\d{2}\\.\\d{2}\\.\\d{2}\\.\\d{6}"},
+            {"value": "R20-M1-N8-I", "type": "VARIABLE", "regex": "[0-9A-Z-]+?"},
+            {"value": ":", "type": "CONSTANT"},
+            {"value": "J18-U01", "type": "VARIABLE", "regex": "[0-9A-Z-]+?"},
+            {"value": "RAS", "type": "VARIABLE", "regex": "[A-Z]{1,10}"},
+            {"value": "APP", "type": "VARIABLE", "regex": "[A-Z]{1,10}"},
+            {"value": "FATAL", "type": "VARIABLE", "regex": "[A-Z]{1,10}"},
+            {"value": "ciod", "type": "CONSTANT"},
+            {"value": ":", "type": "CONSTANT"},
+            {"value": "Error loading", "type": "CONSTANT"},
+            {"value": "/home/streitz/src/ddcMD1.1.11/bin/ddcMDbglV", "type": "VARIABLE", "regex": "/\\S+"},
+            {"value": ":", "type": "CONSTANT"},
+            {"value": "invalid or missing program image, No such file or directory", "type": "CONSTANT"}
+        ],
+        "examples": [
+            "- 1117953058 2005.06.04 R20-M1-N8-I:J18-U01 2005-06-04-23.30.58.830299 R20-M1-N8-I:J18-U01 RAS APP FATAL ciod: Error loading /home/streitz/src/ddcMD1.1.11/bin/ddcMDbglV: invalid or missing program image, No such file or directory",
+            "- 1117953124 2005.06.04 R33-M0-N2-I:J12-U11 2005-06-04-23.32.04.556732 R33-M0-N2-I:J12-U11 RAS APP FATAL ciod: Error loading /home/chen/applications/molecular/bin/simulator: invalid or missing program image, No such file or directory",
+            "- 1117953892 2005.06.04 R42-M1-N4-I:J08-U01 2005-06-04-23.44.52.123456 R42-M1-N4-I:J08-U01 RAS APP FATAL ciod: Error loading /home/kumar/test/parallel/mpi_test: invalid or missing program image, No such file or directory",
+            "- 1117954201 2005.06.04 R15-M0-N6-I:J22-U08 2005-06-04-23.50.01.987654 R15-M0-N6-I:J22-U08 RAS APP FATAL ciod: Error loading /home/zhang/projects/quantum/bin/qsim: invalid or missing program image, No such file or directory",
+            "- 1117954687 2005.06.04 R28-M1-N1-I:J15-U03 2005-06-04-23.58.07.445566 R28-M1-N1-I:J15-U03 RAS APP FATAL ciod: Error loading /home/smith/code/hpc/test_suite/parallel_bench: invalid or missing program image, No such file or directory"
+        ],
+        "description": "These log lines report errors from the Ciod (Control Input/Output Daemon) service when attempting to load program images on a BlueGene/L system.",
+        "format": "<Label> <Timestamp> <Date> <Location1>:<SubLocation1> <DetailedTimestamp> <Location2>:<SubLocation2> <Type> <Component> <Severity> ciod: Error loading <ProgramPath>: invalid or missing program image, No such file or directory",
+        "key_values": ["There are no key-value pairs"],
+        "constants": [":","ciod:", "Error loading", ":", "invalid or missing program image, No such file or directory"],
+        "variables": [
+            "<Label>: Log label (-)",
+            "<Timestamp>: Unix timestamp (1117953058)",
+            "<Date>: Date in YYYY.MM.DD format (2005.06.04)",
+            "<Location1>: Primary location identifier (R20-M1-N8-I)",
+            "<SubLocation1>: Sub-location identifier (J18-U01)",
+            "<DetailedTimestamp>: Detailed timestamp with microseconds (2005-06-04-23.30.58.830299)",
+            "<Location2>: Secondary location identifier (R20-M1-N8-I)",
+            "<SubLocation2>: Secondary sub-location identifier (J18-U01)",
+            "<ProgramPath>: Path to the program being loaded (/home/streitz/src/ddcMD1.1.11/bin/ddcMDbglV)",
+            "<Type>: Type of message (RAS)",
+            "<Component>: Component generating the message (APP)",
+            "<Severity>: Severity level of the message (FATAL)"
+        ]
+    }
+]

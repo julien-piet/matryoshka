@@ -1,0 +1,52 @@
+[
+    {
+        "template": [
+            {"value": "2017-07-20T11:30:02.106135-04:00", "type": "VARIABLE", "regex": "\\S+"},
+            {"value": "httpboot", "type": "VARIABLE", "regex": "\\S+"},
+            {"value": "CRON", "type": "CONSTANT"},
+            {"value": "[", "type": "CONSTANT"},
+            {"value": "1263", "type": "VARIABLE", "regex": "\\d+"},
+            {"value": "]:", "type": "CONSTANT"},
+            {"value": "pam_unix", "type": "CONSTANT"},
+            {"value": "(", "type": "CONSTANT"},
+            {"value": "crond:session", "type": "VARIABLE", "regex": "\\S+"},
+            {"value": "):", "type": "CONSTANT"},
+            {"value": "session", "type": "CONSTANT"},
+            {"value": "closed", "type": "CONSTANT"},
+            {"value": "for", "type": "CONSTANT"},
+            {"value": "user", "type": "CONSTANT"},
+            {"value": "root", "type": "VARIABLE", "regex": "\\S+"}
+        ],
+        "examples": [
+            "2017-07-20T11:30:02.106135-04:00 httpboot CRON[1263]: pam_unix(crond:session): session closed for user root",
+            "2017-07-18T01:00:01.303365-04:00 httpboot CRON[17291]: pam_unix(crond:session): session closed for user root",
+            "2017-07-17T19:15:01.728353-04:00 httpboot CRON[15301]: pam_unix(crond:session): session closed for user root",
+            "2017-08-05T19:15:01.861861-04:00 httpboot CRON[7196]: pam_unix(crond:session): session closed for user root",
+            "2017-08-01T04:45:01.910605-04:00 httpboot CRON[18699]: pam_unix(crond:session): session closed for user root"
+        ],
+        "description": "These log lines record PAM (Pluggable Authentication Modules) session closure events for CRON jobs, documenting when scheduled task sessions end for specific users.",
+        "format": "<Timestamp> <Hostname> CRON[<PID>]: pam_unix(<Service>): session closed for user <Username>",
+        "key_values": [
+            "user <Username>"
+        ],
+        "constants": [
+            "CRON",
+            "[",
+            "]:",
+            "pam_unix",
+            "(",
+            "):",
+            "session",
+            "closed",
+            "for",
+            "user"
+        ],
+        "variables": [
+            "<Timestamp>: ISO8601 timestamp with timezone (2017-07-20T11:30:02.106135-04:00)",
+            "<Hostname>: System hostname (httpboot)",
+            "<PID>: Process ID of the CRON job (1263)",
+            "<Service>: PAM service and type (crond:session)",
+            "<Username>: Username whose session was closed (root)"
+        ]
+    }
+]

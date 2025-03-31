@@ -1,0 +1,1 @@
+These log record all events that occured at a large HPC cluster. The prefix of each log message contains the following information (in order of appearance): a log identifier, a node identifier, the component that is reporting the event, the state of the node, a timestamp, and a flag.

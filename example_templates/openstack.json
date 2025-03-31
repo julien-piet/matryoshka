@@ -1,0 +1,50 @@
+[
+    {
+        "template": [
+            {"value": "nova-compute.log.1.2017-05-17_12:02:35", "type": "VARIABLE", "regex": "\\S+"},
+            {"value": "2017-05-16 18:17:27.614", "type": "VARIABLE", "regex": "\\d{4}-\\d{2}-\\d{2}\\s+\\d{2}:\\d{2}:\\d{2}\\.\\d{3}"},
+            {"value": "2931", "type": "VARIABLE", "regex": "\\d+"},
+            {"value": "INFO", "type": "VARIABLE", "regex": "\\S+"},
+            {"value": "nova.compute.manager", "type": "VARIABLE", "regex": "\\S+"},
+            {"value": "[", "type": "CONSTANT"},
+            {"value": "req-57aeacb3-5223-41c0-babf-8171cbc4214a 113d3a99c3da401fbd62cc2caa5b96d2 54fadb412c4e40cdbaed9335e4c35a9e - - -", "type": "VARIABLE", "regex": ".*?"},
+            {"value": "]", "type": "CONSTANT"},
+            {"value": "[instance:", "type": "CONSTANT"},
+            {"value": "bb6843cc-739b-40da-8cd4-0cff8668d7f1", "type": "VARIABLE", "regex": "\\S+"},
+            {"value": "]", "type": "CONSTANT"},
+            {"value": "Took", "type": "CONSTANT"},
+            {"value": "1.00", "type": "VARIABLE", "regex": "\\d+\\.\\d+"},
+            {"value": "seconds to destroy the instance on the hypervisor.", "type": "CONSTANT"}
+        ],
+        "examples": [
+            "nova-compute.log.1.2017-05-17_12:02:35 2017-05-16 18:17:27.614 2931 INFO nova.compute.manager [req-57aeacb3-5223-41c0-babf-8171cbc4214a 113d3a99c3da401fbd62cc2caa5b96d2 54fadb412c4e40cdbaed9335e4c35a9e - - -] [instance: bb6843cc-739b-40da-8cd4-0cff8668d7f1] Took 1.00 seconds to destroy the instance on the hypervisor.",
+            "nova-compute.log.1.2017-05-17_12:02:35 2017-05-16 20:27:38.067 2931 INFO nova.compute.manager [req-d163ef0e-7346-4493-896a-f58f39d78a13 113d3a99c3da401fbd62cc2caa5b96d2 54fadb412c4e40cdbaed9335e4c35a9e - - -] [instance: e9170d30-8159-4177-979d-e5b24409e1df] Took 1.01 seconds to destroy the instance on the hypervisor.",
+            "nova-compute.log.1.2017-05-17_12:02:35 2017-05-16 18:48:34.488 2931 INFO nova.compute.manager [req-da50b37a-32bf-45b5-8dcf-d0aff5a33131 113d3a99c3da401fbd62cc2caa5b96d2 54fadb412c4e40cdbaed9335e4c35a9e - - -] [instance: 6f4820cc-594d-42a7-a69d-aca00f0b13d9] Took 1.05 seconds to destroy the instance on the hypervisor.",
+            "nova-compute.log.1.2017-05-17_12:02:35 2017-05-16 15:49:02.661 2931 INFO nova.compute.manager [req-01da99ae-3285-4499-b2ba-cc705abd3e9c 113d3a99c3da401fbd62cc2caa5b96d2 54fadb412c4e40cdbaed9335e4c35a9e - - -] [instance: 7e38051a-2593-49a4-8b8c-3a6a6a8b80cf] Took 0.99 seconds to destroy the instance on the hypervisor.",
+            "nova-compute.log.1.2017-05-16_13:55:31 2017-05-16 01:28:49.245 2931 INFO nova.compute.manager [req-b6e7a276-f1e8-407b-8c4e-6ca612cdca0c 113d3a99c3da401fbd62cc2caa5b96d2 54fadb412c4e40cdbaed9335e4c35a9e - - -] [instance: 7b2c2b50-c768-4eee-8f57-fd6ed93a0a8c] Took 1.05 seconds to destroy the instance on the hypervisor."
+        ],
+        "description": "These log lines record OpenStack Nova compute operations for destroying instances, including the time taken for the operation.",
+        "format": "<Logrecord> <Datetime> <Pid> <Level> <Component> [<ADDR>] [instance: <UID>] Took <Time> seconds to destroy the instance on the hypervisor.",
+        "key_values": [
+            "instance: <UID>"
+        ],
+        "constants": [
+            "[",
+            "]",
+            "[instance:",
+            "]",
+            "Took",
+            "seconds to destroy the instance on the hypervisor."
+        ],
+        "variables": [
+            "<Logrecord>: Log file identifier (nova-compute.log.1.2017-05-17_12:02:35)",
+            "<Datetime>: Timestamp with milliseconds (2017-05-16 18:17:27.614)",
+            "<Pid>: Process ID (2931)",
+            "<Level>: Log level (INFO)",
+            "<Component>: System component (nova.compute.manager)",
+            "<ADDR>: Request address and parameters (req-57aeacb3-5223-41c0-babf-8171cbc4214a 113d3a99c3da401fbd62cc2caa5b96d2 54fadb412c4e40cdbaed9335e4c35a9e - - -)",
+            "<UID>: Instance UUID (bb6843cc-739b-40da-8cd4-0cff8668d7f1)",
+            "<Time>: Operation duration in seconds (1.00)"
+        ]
+    }
+]

@@ -1,0 +1,46 @@
+[
+    {
+        "template": [
+            {"value": "[", "type": "CONSTANT"},
+            {"value": "Mon Feb 27 05:59:28 2006", "type": "VARIABLE", "regex": "\\S.*?\\d{4}"},
+            {"value": "]", "type": "CONSTANT"},
+            {"value": "[", "type": "CONSTANT"},
+            {"value": "error", "type": "VARIABLE", "regex": "\\S+"},
+            {"value": "]", "type": "CONSTANT"},
+            {"value": "[", "type": "CONSTANT"},
+            {"value": "client", "type": "CONSTANT"},
+            {"value": "220.163.7.170", "type": "VARIABLE", "regex": "(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}|[0-9a-fA-F:]+)"},
+            {"value": "]", "type": "CONSTANT"},
+            {"value": "Directory index forbidden by rule:", "type": "CONSTANT"},
+            {"value": "/var/www/html/", "type": "VARIABLE", "regex": "\\S+"}
+        ],
+        "examples": [
+            "[Mon Feb 27 05:59:28 2006] [error] [client 220.163.7.170] Directory index forbidden by rule: /var/www/html/",
+            "[Mon Feb 27 08:17:09 2006] [error] [client 71.115.21.80] Directory index forbidden by rule: /var/www/html/",
+            "[Mon Feb 27 09:59:43 2006] [error] [client 211.169.226.101] Directory index forbidden by rule: /var/www/html/",
+            "[Mon Feb 27 10:05:24 2006] [error] [client 61.93.54.136] Directory index forbidden by rule: /var/www/html/",
+            "[Mon Feb 27 11:41:13 2006] [error] [client 203.95.104.18] Directory index forbidden by rule: /var/www/html/"
+        ],
+        "description": "These log lines record Apache web server errors when clients attempt to access forbidden directory indexes.",
+        "format": "[<Timestamp>] [<Level>] [client <ClientIP>] Directory index forbidden by rule: <Path>",
+        "key_values": [
+            "client <ClientIP>"
+        ],
+        "constants": [
+            "[",
+            "]",
+            "[",
+            "]",
+            "[",
+            "client",
+            "]",
+            "Directory index forbidden by rule:"
+        ],
+        "variables": [
+            "<Timestamp>: Apache timestamp format (Mon Feb 27 05:59:28 2006)",
+            "<Level>: Log level (error)",
+            "<ClientIP>: IP address of the client (220.163.7.170)",
+            "<Path>: Directory path that was accessed (/var/www/html/)"
+        ]
+    }
+]

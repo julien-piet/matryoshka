@@ -1,0 +1,420 @@
+import json
+import os
+import re
+from collections import Counter, defaultdict
+
+import dill
+from tqdm import tqdm
+
+from ..tools.api import OpenAITask
+from ..tools.classes import Parser, Template
+from ..tools.embedding import NaiveDistance
+from ..tools.logging import get_logger
+from ..tools.module import Module
+from ..tools.OCSF import OCSFSchemaClient
+from ..tools.prompts.typing import DEFAULT_TYPES, gen_prompt
+
+
+class TemplateTyper:
+
+    def __init__(
+        self,
+        caller,
+        parser,
+        few_shot_len=3,
+        output_dir="output/",
+        model="gemini-1.5-flash",
+    ):
+        self.tree = parser.tree
+        self.entries_per_template = parser.entries_per_template
+        self.values = parser.values
+        self.types = set()
+        self.few_shot_len = few_shot_len
+        self.caller = caller
+        self.model = model
+        self.output_dir = output_dir
+
+        self.client = OCSFSchemaClient(self.caller)
+        self.var_mapping = parser.var_mapping
+        self.schema_mapping = parser.schema_mapping
+
+        self.node_to_cluster = {}
+        self.cluster_to_nodes = {}
+
+        # Fix potential value id issues
+        del_list = set()
+        for id, val in self.values.items():
+            val.element_id = id
+            if not len(val.values):
+                del_list.add(id)
+            elif not self.tree.nodes[id]:
+                del_list.add(id)
+
+        for id in del_list:
+            del self.values[id]
+
+        self.paths = {
+            "prompts": os.path.join(self.output_dir, "prompts/"),
+            "outputs": os.path.join(self.output_dir, "outputs/"),
+            "results": os.path.join(self.output_dir, "results/"),
+        }
+        os.makedirs(self.paths["prompts"], exist_ok=True)
+        os.makedirs(self.paths["outputs"], exist_ok=True)
+        os.makedirs(self.paths["results"], exist_ok=True)
+
+        # Build embedding
+        if not parser.embedding:
+            self.embedding = NaiveDistance()
+            for template_id, entries in self.entries_per_template.items():
+                template = self.tree.gen_template(template_id)
+                self.embedding.add_template(template_id, template)
+                for entry in entries:
+                    match, match_obj = template.match(entry)
+                    if not match:
+                        get_logger().warning(
+                            "Entry %s does not match template %s",
+                            entry,
+                            template,
+                        )
+                    else:
+                        self.embedding.update(match_obj)
+
+            for template_id in self.entries_per_template:
+                self.embedding.template_embeddings[template_id].simplify()
+
+        else:
+            self.embedding = parser.embedding
+
+    def _get_typing_prompt_variables(self, element_ids):
+        if not isinstance(element_ids, list):
+            element_ids = [element_ids]
+
+        matches = list(
+            {
+                v
+                for node in element_ids
+                for v in self.values[node].value_counts.keys()
+            }
+        )
+        templates = [
+            [
+                self.tree.gen_template(t)
+                for t in self.tree.templates_per_node[node]
+            ]
+            for node in element_ids
+        ]
+        elements = [self.tree.nodes[element_id] for element_id in element_ids]
+        all_matches = matches + [element.value for element in elements]
+        matches = list(set(all_matches))
+
+        return templates, elements, matches
+
+    def _write(self, query, response, element, determined_type, selected_regex):
+        # Placeholder for writing logic
+        with open(
+            os.path.join(self.paths["prompts"], str(element.id)),
+            "w",
+            encoding="utf-8",
+        ) as f:
+            f.write(query)
+
+        with open(
+            os.path.join(self.paths["outputs"], str(element.id)),
+            "w",
+            encoding="utf-8",
+        ) as f:
+            f.write(response)
+
+        with open(
+            os.path.join(self.paths["results"], str(element.id)),
+            "w",
+            encoding="utf-8",
+        ) as f:
+            f.write(f"{element}\n{determined_type}\n{selected_regex}")
+
+    def get_closest_nodes(self, element_ids, k=3):
+        """
+        Get the k closest nodes to the given element ids based on their values.
+        """
+        if not isinstance(element_ids, list):
+            element_ids = [element_ids]
+        element_id_set = set(element_ids)
+
+        typed_variable_values = [
+            val
+            for id, val in self.values.items()
+            if self.tree.nodes[id].is_variable()
+            and self.tree.nodes[id].type is not None
+            and id not in element_id_set
+        ]
+        few_shot_nodes_per_element = [
+            {
+                val.element_id: val_idx
+                for val_idx, val in enumerate(
+                    self.values[element_id].get_closest(
+                        typed_variable_values,
+                        k=self.few_shot_len,
+                        tree=self.tree,
+                        embedding=self.embedding,
+                    )
+                )
+            }
+            for element_id in element_ids
+        ]
+        all_possible_element_ids = {
+            key for d in few_shot_nodes_per_element for key in d
+        }
+
+        candidate_few_shot_clusters = [
+            self.node_to_cluster[k[0]]
+            for k in sorted(
+                [
+                    (
+                        key,
+                        sum(
+                            d.get(key, len(d))
+                            for d in few_shot_nodes_per_element
+                        ),
+                    )
+                    for key in all_possible_element_ids
+                ],
+                key=lambda x: x[1],
+                reverse=True,
+            )
+        ]
+        chosen = set()
+        while len(chosen) < self.few_shot_len and len(
+            candidate_few_shot_clusters
+        ):
+            cluster = candidate_few_shot_clusters.pop(0)
+            if cluster not in chosen:
+                chosen.add(cluster)
+
+        return list(chosen)
+
+    def typing(self, element_ids, **kwargs):
+
+        kwargs["n"] = 5
+        kwargs["temperature"] = 0.5
+
+        if not isinstance(element_ids, list):
+            element_ids = [element_ids]
+
+        # Get relevant variables and generate prompts
+        templates, elements, matches = self._get_typing_prompt_variables(
+            element_ids
+        )
+        few_shot_examples = []
+
+        few_shot_clusters = self.get_closest_nodes(element_ids)
+        for cluster in few_shot_clusters:
+            nodes = self.cluster_to_nodes[cluster]
+            fs_templates = [
+                [
+                    self.tree.gen_template(t)
+                    for t in self.tree.templates_per_node[node]
+                ]
+                for node in nodes
+            ]
+            fs_values = list(
+                {
+                    v
+                    for node in nodes
+                    for v in self.values[node].value_counts.keys()
+                }
+            )
+            few_shot_examples.append(
+                (fs_templates, fs_values, nodes, self.tree.nodes[nodes[0]].type)
+            )
+
+        while True:
+            user, system = gen_prompt(
+                templates,
+                matches,
+                element_ids,
+                few_shot_examples,
+                self.client,
+            )
+            task = OpenAITask(
+                system_prompt=system,
+                max_tokens=2048,
+                model=self.model,
+                message=user,
+                **kwargs,
+            )
+
+            try:
+                candidates = self.caller([task])[0].candidates
+                break
+            except ValueError as e:
+                get_logger().warning(
+                    "Error in typing %s (%s): %s",
+                    element_ids,
+                    elements[0],
+                    e,
+                )
+                breakpoint()
+                if len(few_shot_examples) == 1:
+                    few_shot_examples = None
+                elif len(few_shot_examples) > 1:
+                    few_shot_examples = few_shot_examples[:-1]
+                else:
+                    raise e
+
+        valid_candidates = []
+        valid_regexes = []
+        if isinstance(candidates, str):
+            candidates = [candidates]
+
+        regex_pattern = re.compile(
+            r"\* regex(?:.(?!\* final answer))*?```(.*?)```",
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+        type_pattern = re.compile(
+            r"final answer.*```(.*?)```.*?$",
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+        for candidate in candidates:
+            candidate = candidate["content"]
+            type_match = type_pattern.search(candidate)
+            if not type_match:
+                continue
+            proposed_type = type_match.group(1).strip()
+
+            if (
+                proposed_type.lower() not in self.client.get_basic_types()
+                and proposed_type.lower() not in ["none_t", "composite_t"]
+            ):
+                continue
+
+            valid_candidates.append(proposed_type.lower())
+
+            regex_match = regex_pattern.search(candidate)
+            if regex_match:
+                try:
+                    valid_regexes.append(
+                        Template.unescape_string(regex_match.group(1).strip())
+                    )
+                except json.decoder.JSONDecodeError:
+                    valid_regexes.append(regex_match.group(1).strip())
+
+        if not len(valid_candidates):
+            get_logger().warning(
+                "No valid candidate types found for element %s (%s)",
+                element_ids,
+                elements[0],
+            )
+            return None, None
+
+        count_per_candidate = Counter(valid_candidates)
+        max_count = max(count_per_candidate.values())
+        valid_candidates = list(
+            {v for v in valid_candidates if count_per_candidate[v] == max_count}
+        )
+
+        # Heuristic: if many candidates are found, prefer 1/NONE 2/MSG or COMPOSITE, 3/ A type in DEFAULT_TYPES 4/ a type in self.add_types 5/ a new type
+        valid_candidates_tagged = []
+        for c in valid_candidates:
+            if c == "none_t":
+                valid_candidates_tagged.append(c)
+            elif c == "composite_t":
+                valid_candidates_tagged.append(c)
+            else:
+                valid_candidates_tagged.append("DEFAULT")
+
+        counts = Counter(valid_candidates_tagged)
+        max_count = max(counts.values())
+        filtered_tagged_candidates = [
+            c for c in valid_candidates_tagged if counts[c] == max_count
+        ]
+        if "none_t" in filtered_tagged_candidates:
+            determined_tag = "none_t"
+        elif "composite_t" in filtered_tagged_candidates:
+            determined_tag = "composite_t"
+        elif "DEFAULT" in filtered_tagged_candidates:
+            determined_tag = "DEFAULT"
+
+        determined_type = next(
+            c
+            for c, t in zip(valid_candidates, valid_candidates_tagged)
+            if t == determined_tag
+        )
+
+        for element_id in element_ids:
+            self.tree.nodes[element_id].type = determined_type
+
+        get_logger().info(
+            "Assigned type %s to %s (%s)",
+            determined_type,
+            element_ids,
+            elements[0],
+        )
+
+        self._write(
+            query=system + "\n\n##########\n\n" + user,
+            response="\n\n###########\n\n".join(
+                [c["content"] for c in candidates]
+            ),
+            element=elements[0],
+            determined_type=determined_type,
+            selected_regex=None,
+        )
+
+        return determined_type, None
+
+    def run(self):
+        ### Group by var_mapping
+        name_clusters = defaultdict(list)
+        clusters = []
+        for k, n in enumerate(self.tree.nodes):
+            if n and n.is_variable() and k in self.var_mapping:
+                name_clusters[self.var_mapping[k].created_attribute].append(k)
+            elif n and n.is_variable():
+                clusters.append([k])
+
+        for v in name_clusters.values():
+            clusters.append(v)
+
+        self.node_to_cluster = {
+            node: cluster_id
+            for cluster_id, cluster in enumerate(clusters)
+            for node in cluster
+        }
+        self.cluster_to_nodes = {
+            cluster_id: cluster for cluster_id, cluster in enumerate(clusters)
+        }
+        volumes_per_cluster = {
+            k: sum(len(self.values[x].values) for x in v)
+            for k, v in self.cluster_to_nodes.items()
+        }
+
+        determination_order = sorted(
+            volumes_per_cluster.keys(),
+            key=lambda x: volumes_per_cluster[x],
+            reverse=True,
+        )
+
+        for cluster_id in tqdm(
+            determination_order,
+            total=len(determination_order),
+            desc="Typing Elements",
+            unit="element",
+        ):
+            element_ids = self.cluster_to_nodes[cluster_id]
+            if any(
+                self.tree.nodes[element_id].type is None
+                for element_id in element_ids
+            ):
+                self.typing(element_ids)
+
+        parser = Parser(
+            self.tree,
+            self.values,
+            self.entries_per_template,
+            self.embedding,
+            var_mapping=self.var_mapping,
+            schema_mapping=self.schema_mapping,
+        )
+        print(os.path.join(self.output_dir, "parser.dill"))
+        with open(os.path.join(self.output_dir, "parser.dill"), "wb") as f:
+            dill.dump(parser, f)

@@ -1,0 +1,50 @@
+[
+    {
+        "template": [
+            {"value": "17/06/09 11:08:17", "type": "VARIABLE", "regex": "\\d{2}/\\d{2}/\\d{2}\\s+\\d{2}:\\d{2}:\\d{2}"},
+            {"value": "INFO", "type": "VARIABLE", "regex": "\\S+"},
+            {"value": "executor.Executor", "type": "VARIABLE", "regex": "\\S+"},
+            {"value": ":", "type": "CONSTANT"},
+            {"value": "Finished task", "type": "CONSTANT"},
+            {"value": "23.0", "type": "VARIABLE", "regex": "\\d+\\.\\d+"},
+            {"value": "in stage", "type": "CONSTANT"},
+            {"value": "2354.0", "type": "VARIABLE", "regex": "\\d+\\.\\d+"},
+            {"value": "(TID", "type": "CONSTANT"},
+            {"value": "94223", "type": "VARIABLE", "regex": "\\d+"},
+            {"value": ").", "type": "CONSTANT"},
+            {"value": "2364", "type": "VARIABLE", "regex": "\\d+"},
+            {"value": "bytes result sent to driver", "type": "CONSTANT"}
+        ],
+        "examples": [
+            "17/06/09 11:08:17 INFO executor.Executor: Finished task 23.0 in stage 2354.0 (TID 94223). 2364 bytes result sent to driver",
+            "17/06/09 17:28:20 INFO executor.Executor: Finished task 15.0 in stage 3152.0 (TID 134052). 2163 bytes result sent to driver",
+            "17/06/08 20:11:35 INFO executor.Executor: Finished task 9.0 in stage 8045.0 (TID 321844). 2156 bytes result sent to driver",
+            "17/02/01 18:16:46 INFO executor.Executor: Finished task 242.0 in stage 429.0 (TID 76629). 1344 bytes result sent to driver",
+            "17/06/08 20:53:00 INFO executor.Executor: Finished task 29.0 in stage 12029.0 (TID 481225). 2667 bytes result sent to driver"
+        ],
+        "description": "These log lines record Spark executor task completions, including task details and the size of results sent to the driver.",
+        "format": "<Datetime> <Level> <Component>: Finished task <Task> in stage <Stage> (TID <TID>). <ByteCount> bytes result sent to driver",
+        "key_values": [
+            "task <Task>",
+            "stage <Stage>",
+            "TID <TID>"
+        ],
+        "constants": [
+            ":",
+            "Finished task",
+            "in stage",
+            "(TID",
+            ").",
+            "bytes result sent to driver"
+        ],
+        "variables": [
+            "<Datetime>: Timestamp in YY/MM/DD HH:mm:ss format (17/06/09 11:08:17)",
+            "<Level>: Log level (INFO)",
+            "<Component>: Component name (executor.Executor)",
+            "<Task>: Task identifier (23.0)",
+            "<Stage>: Stage identifier (2354.0)",
+            "<TID>: Task ID number (94223)",
+            "<ByteCount>: Size of result in bytes (2364)"
+        ]
+    }
+]
