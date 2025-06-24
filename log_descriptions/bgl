@@ -1,1 +1,0 @@
-These logs record all events that occurred on the Blue Gene/L (BGL) supercomputer system. The prefix of each log message contains the following information: a timestamp and date, a node identifier, the full current time, another node identifier, the type of messagte, the affected component, and the level of severity.

@@ -1,0 +1,3196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Parser Tree Editor</title>
+  <!-- Dagre for layout -->
+  <script src="https://cdn.jsdelivr.net/npm/dagre@0.8.5/dist/dagre.min.js"></script>
+  <style>
+    /* Basic layout */
+    html, body {
+      margin: 0; padding: 0; height: 100%;
+      display: flex; flex-direction: column;
+      font-family: sans-serif;
+    }
+    header {
+      background: #f9f9f9; border-bottom: 1px solid #ccc;
+      padding: 0.5rem 1rem; display: flex; align-items: center; gap: 1rem;
+      position: relative;
+    }
+    #container {
+      flex: 1; display: flex; overflow: hidden;
+    }
+    #leftPanel {
+      width: 70%;
+      border-right: 1px solid #ccc;
+      overflow: auto;
+      position: relative;
+      max-height: 100vh;
+    }
+    #detailPanel {
+      flex: 1; padding: 1rem; overflow-y: auto;
+      max-height: 100vh;
+    }
+    .modeBtn.active { background: #cce; }
+    #treeContainer { background: #fff; display: none; }
+
+    /* Template list container (for “Templates” mode) */
+    #templateListContainer {
+      display: none;
+      padding: 0.5rem;
+    }
+    /* Attribute list container (for “Attributes” mode) */
+    #mappingsListContainer {
+      display: none;
+      padding: 0.5rem;
+    }
+    /* Type list container (for “Types” mode) */
+    #typeListContainer {
+      display: none;
+      padding: 0.5rem;
+    }
+    /* Event list container (for “Events” mode) */
+    #eventListContainer {
+      display: none;
+      padding: 0.5rem;
+    }
+    /* Mapping list container (for “Mapping” mode) */
+    #mappingListContainer {
+      display: none;
+      padding: 0.5rem;
+    }
+    /* NEW: Query mode container */
+    #queryModeContainer {
+      display: none;
+      padding: 0.5rem;
+    }
+    /* In “query” mode, the right pane will display the field list. */
+    #queryFieldList {
+      display: none;
+    }
+
+    .templateItem {
+      margin-bottom: 1rem;
+      border-bottom: 1px solid #ccc;
+      padding-bottom: 0.5rem;
+    }
+    .templateId {
+      color: darkred; cursor: pointer; margin-right: 0.5rem;
+    }
+    .templateNode { cursor: pointer; margin: 0 0.2rem; }
+    .separator { color: #999; }
+
+    .edgePath {
+      stroke: #999; stroke-width: 1.5px; fill: none;
+    }
+    .nodeRect {
+      fill: #eee; stroke: #666; stroke-width: 1.5px;
+      rx: 6; ry: 6; cursor: pointer;
+    }
+    .nodeRect.variable { fill: #ccf; }
+    .nodeRect.endTemplate { fill: #cfc; }
+    .nodeLabel {
+      font-size: 14px; fill: #333; pointer-events: none;
+    }
+    .formRow { margin: 0.5rem 0; }
+    .formRow label {
+      display: inline-block; width: 120px; font-weight: bold;
+    }
+    .formRow input[type='text'],
+    .formRow input[type='number'],
+    .formRow select,
+    .formRow textarea {
+      margin-left: 0.5rem;
+    }
+    #loadingOverlay {
+      display: none; position: fixed; z-index: 9999; top: 0; left: 0;
+      width: 100%; height: 100%; background: rgba(255,255,255,0.5);
+      align-items: center; justify-content: center; font-size: 2rem; color: #333;
+    }
+    .deleteCandidate {
+      stroke: red !important; stroke-width: 3px; fill: #fee;
+    }
+    .deleteCandidateText {
+      background: #fee; 
+      border: 1px solid red; 
+      border-radius:3px; 
+      padding:2px;
+    }
+
+    /* Zoom controls, position: fixed in bottom-left corner */
+    #zoomControls {
+      position: fixed;
+      bottom: 10px;
+      left: 10px;
+      background: #fff;
+      border: 1px solid #ccc;
+      padding: 0.5rem;
+      display: none;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+      z-index: 1000;
+    }
+    #zoomControls button {
+      margin: 0 2px;
+      width: 2em;
+      height: 2em;
+      font-size: 1em;
+    }
+
+    /* Shared styling for attribute, type, event, mapping lists */
+    .attributeSection {
+      margin-bottom: 1rem;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    .attributeHeader {
+      background: #f0f0f0;
+      padding: 4px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    .attributeToggleBtn {
+      margin-right: 0.5rem;
+      color: #666;
+    }
+    .attributeName {
+      cursor: pointer;
+    }
+    .attributeNodes {
+      padding: 4px 8px;
+    }
+    .mappingNode {
+      cursor: pointer;
+    }
+
+    /* Stats popup at top-right */
+    #statsPopup {
+      display: none;
+      position: absolute;
+      top: 3.5rem;
+      right: 1rem;
+      background: #f9f9f9;
+      border: 1px solid #ccc;
+      padding: 1rem;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+      z-index: 1000;
+    }
+
+    /* Mapping edit panel for checkboxes list + search */
+    .mappingEditContainer {
+      border: 1px solid #ccc;
+      margin: 0.5rem 0;
+      max-height: 300px;
+      overflow: auto;
+      padding: 0.5rem;
+      display: flex;
+      flex-direction: column;
+    }
+    .mappingCheckboxRow {
+      display: block;
+      white-space: nowrap; /* ensures no wrap for long fields */
+    }
+    #mappingSearchInput {
+      width: 60%;
+      margin-bottom: 0.5rem;
+    }
+
+    /* OCSF mapped fields in read-only view */
+    .mappingReadOnlyBox {
+      max-height: 100px;
+      overflow: auto;
+      border: 1px solid #ccc;
+      padding: 4px;
+    }
+    .mappingReadOnlyBox > div {
+      white-space: nowrap;  /* one attribute per line, horizontally scroll if too long */
+    }
+  </style>
+</head>
+<body>
+<header>
+  <button id="modeNodeBtn" class="modeBtn active">Node Edition Mode</button>
+  <button id="modeTemplateBtn" class="modeBtn">Template Edition Mode</button>
+  <button id="deleteNodesBtn" style="background:#fcc; margin-left:1em;">Delete Nodes</button>
+  <button id="batchUpdateBtn" style="background:#ccf; margin-left:1em;">Batch Update</button>
+
+  <label for="viewModeSelect" style="margin-left:1em;">View mode:</label>
+  <select id="viewModeSelect">
+    <option value="graph">Graph</option>
+    <option value="template">Templates</option>
+    <option value="attribute">Attributes</option>
+    <option value="type">Types</option>
+    <option value="event">Events</option>
+    <option value="mapping">Mapping</option>
+    <!-- NEW: Query mode -->
+    <option value="query">Query</option>
+  </select>
+
+  <button id="saveBtn" style="background:#cfc; margin-left:1em;">Save</button>
+  <button id="debugBtn" style="background:rgb(225, 165, 13); margin-left:1em;">Debug</button>
+
+  <label for="reparseToggle" style="margin-left: 1em;">Auto Reparse</label>
+  <input type="checkbox" id="reparseToggle" checked />
+  <button id="manualReparseBtn" title="Force a re-parse now.">Reparse Now</button>
+
+  <button id="statsBtn" style="margin-left:1em;">Stats</button>
+
+  <span id="currentMode" style="margin-left: auto;">Mode: node</span>
+  <button id="reloadBtn">Reload Tree</button>
+
+  <div id="statsPopup">
+    <button id="closeStatsPopupBtn" style="float:right;">Close</button>
+    <h4>Stats</h4>
+    <div id="statsPopupContent"></div>
+  </div>
+</header>
+<div id="container">
+  <div id="leftPanel">
+    <!-- Graph container (for “Graph” mode) -->
+    <svg id="treeContainer"></svg>
+
+    <!-- Template list container (for “Templates” mode) -->
+    <div id="templateListContainer"></div>
+
+    <!-- Attribute list container (for “Attributes” mode) -->
+    <div id="mappingsListContainer"></div>
+
+    <!-- Type list container (for “Types” mode) -->
+    <div id="typeListContainer"></div>
+
+    <!-- Event list container (for “Events” mode) -->
+    <div id="eventListContainer"></div>
+
+    <!-- Mapping list container (for “Mapping” mode) -->
+    <div id="mappingListContainer"></div>
+
+    <!-- NEW: Query mode container (for “Query” mode) -->
+    <div id="queryModeContainer">
+      <h3>Query Builder</h3>
+      <div class="formRow">
+        <label>Operator (AND/OR):</label>
+        <select id="queryOperatorSel" style="margin-left:0.5rem;">
+          <option value="AND">AND</option>
+          <option value="OR">OR</option>
+        </select>
+      </div>
+      <!-- We'll recursively display conditions/sub-queries below -->
+      <div id="queryEditorContainer" style="margin-bottom:1em; border:1px solid #ccc; padding:0.5em;">
+      </div>
+
+      <button id="addQueryConditionBtn" style="margin:1em 0; background:#eef;">Add Condition</button>
+      <button id="addSubQueryBtn" style="margin:1em; background:#ffd;">Add Sub-Query</button>
+      <br/>
+      <button id="runQueryBtn" style="background:#aea;">Run Query</button>
+      <!-- New query name input and button to save -->
+      <label for="queryNameInput" style="margin-left:1em;">Name:</label>
+      <input id="queryNameInput" type="text" placeholder="Enter query name" style="margin-left:0.5rem;"/>
+      <button id="saveQueryBtn" style="margin-left:0.5rem; background:#ccf;">Save Query</button>
+
+      <div id="queryResultsContainer" style="margin-top:1em;"></div>
+      <button id="saveQueryResultsBtn" style="display:none; margin-top:1em; background:#cfc;">Save Results</button>
+    </div>
+  </div>
+  <div id="detailPanel">
+    <h3>Detail / Editor</h3>
+    <div id="detailContent">Select a node…</div>
+
+    <!-- NEW: Query field list (for “Query” mode) -->
+    <div id="queryFieldList">
+      <h3>Available Fields</h3>
+      <input type="text" id="queryFieldSearch" placeholder="Filter fields..." />
+      <div id="queryFieldListInner" style="max-height:50vh; overflow:auto; border:1px solid #ccc; padding:4px;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Zoom controls -->
+<div id="zoomControls">
+  <button id="zoomInBtn">+</button>
+  <button id="zoomOutBtn">-</button>
+  <button id="resetZoomBtn">◻</button>
+</div>
+
+<div id="loadingOverlay"><div>Loading…</div></div>
+
+<script>
+/**********************************************************
+ * Global state
+ **********************************************************/
+let currentMode = 'node';   // “node” or “template”
+let viewMode = 'graph';     // “graph,” “template,” “attribute,” “type,” “event,” “mapping,” “query”
+let deleteMode = false;
+
+/* For batch updating (nodes or templates): */
+let batchUpdateMode = false;
+let batchSelectedNodes = new Set();      
+let batchSelectedTemplates = new Set();  
+
+let selectedForDeletion = new Set();
+
+/* Controls whether we append “?reparse=true” on modify calls */
+let autoReparse = true;
+
+/* Graph usage */
+let nodeElementsById = {};
+let rawTreeData = {};
+let allTemplates = {};
+
+/* For attribute usage and mapping usage: all node info */
+let allNodes = {}; // node_id => node info from /api/get_all_nodes
+
+/* Valid types from backend */
+let allTypes = [];
+
+/* Valid events from backend */
+let allEvents = [];
+
+/* For “mapping” mode: a cache of all attribute mappings from /api/get_all_attribute_mappings */
+let allAttributeMappings = {};
+
+/**********************************************************
+ * NEW: Query mode data
+ * We store the entire root query object, which can contain nested sub-queries.
+ **********************************************************/
+let rootQuery = {
+  operator: 'AND',
+  conditions: []
+};
+
+let queryFields = {};   // from /api/get_all_field_names => { fieldName : description, ... }
+let queryResults = [];  // last run results
+
+/**********************************************************
+ * References
+ **********************************************************/
+const modeNodeBtn        = document.getElementById('modeNodeBtn');
+const modeTemplateBtn    = document.getElementById('modeTemplateBtn');
+const deleteNodesBtn     = document.getElementById('deleteNodesBtn');
+const batchUpdateBtn     = document.getElementById('batchUpdateBtn');
+const currentModeSpan    = document.getElementById('currentMode');
+const reloadBtn          = document.getElementById('reloadBtn');
+const detailContent      = document.getElementById('detailContent');
+const loadingOverlay     = document.getElementById('loadingOverlay');
+const treeContainer      = document.getElementById('treeContainer');
+const templateListContainer = document.getElementById('templateListContainer');
+const mappingsListContainer  = document.getElementById('mappingsListContainer');
+const typeListContainer      = document.getElementById('typeListContainer');
+const eventListContainer     = document.getElementById('eventListContainer');
+const mappingListContainer   = document.getElementById('mappingListContainer');
+const queryModeContainer     = document.getElementById('queryModeContainer');
+const queryFieldList         = document.getElementById('queryFieldList');
+
+const saveBtn            = document.getElementById('saveBtn');
+const debugBtn           = document.getElementById('debugBtn');
+const zoomControlsDiv    = document.getElementById('zoomControls');
+const zoomInBtn          = document.getElementById('zoomInBtn');
+const zoomOutBtn         = document.getElementById('zoomOutBtn');
+const resetZoomBtn       = document.getElementById('resetZoomBtn');
+const reparseToggle      = document.getElementById('reparseToggle');
+const manualReparseBtn   = document.getElementById('manualReparseBtn');
+const viewModeSelect     = document.getElementById('viewModeSelect');
+const statsBtn           = document.getElementById('statsBtn');
+const statsPopup         = document.getElementById('statsPopup');
+const closeStatsPopupBtn = document.getElementById('closeStatsPopupBtn');
+
+/**********************************************************
+ * Event listeners
+ **********************************************************/
+modeNodeBtn.addEventListener('click', () => setMode('node'));
+modeTemplateBtn.addEventListener('click', () => setMode('template'));
+reloadBtn.addEventListener('click', loadTree);
+
+reparseToggle.addEventListener('change', ()=>{
+  autoReparse = reparseToggle.checked;
+});
+
+manualReparseBtn.addEventListener('click', async()=>{
+  try {
+    showLoadingOverlay();
+    const resp = await fetch('/api/reparse', { method:'POST' });
+    if(!resp.ok){
+      detailContent.innerHTML = '<p style="color:red;">Manual reparse failed.</p>';
+      return;
+    }
+    detailContent.innerHTML = '<p style="color:green;">Reparsed successfully.</p>';
+    loadTree();
+  } catch(e){
+    console.error(e);
+    detailContent.innerHTML = `<p style="color:red;">Error on reparse: ${escapeHtml(String(e))}</p>`;
+  } finally {
+    hideLoadingOverlay();
+  }
+});
+
+/* Save button => GET /api/save */
+saveBtn.addEventListener('click', async () => {
+  try {
+    showLoadingOverlay();
+    const resp = await fetch('/api/save', { method:'GET' });
+    if (!resp.ok) {
+      detailContent.innerHTML = '<p style="color:red;">Save request failed.</p>';
+      return;
+    }
+    detailContent.innerHTML = '<p style="color:green;">Save request completed successfully.</p>';
+  } catch(e) {
+    detailContent.innerHTML = `<p style="color:red;">Error: ${escapeHtml(e.toString())}</p>`;
+    console.log(e);
+  } finally {
+    hideLoadingOverlay();
+  }
+});
+
+/* Debug button => GET /api/break */
+debugBtn.addEventListener('click', async () => {
+  try {
+    showLoadingOverlay();
+    const resp = await fetch('/api/break', { method:'GET' });
+    if (!resp.ok) {
+      detailContent.innerHTML = '<p style="color:red;">Debug request failed.</p>';
+      return;
+    }
+    detailContent.innerHTML = '<p style="color:green;">Debug request completed successfully.</p>';
+  } catch(e) {
+    detailContent.innerHTML = `<p style="color:red;">Error: ${escapeHtml(e.toString())}</p>`;
+    console.log(e);
+  } finally {
+    hideLoadingOverlay();
+  }
+});
+
+/* Single dropdown to switch among all view modes */
+viewModeSelect.addEventListener('change', (e)=>{
+  setViewMode(e.target.value);
+});
+
+/* Toggle Batch Update Mode */
+batchUpdateBtn.addEventListener('click', ()=>{
+  if(!batchUpdateMode){
+    // Turn it on
+    batchUpdateMode = true;
+    batchSelectedNodes.clear();
+    batchSelectedTemplates.clear();
+    detailContent.innerHTML = '<p>Batch update mode ON. Click items to select them, then see the right panel for updates.</p>';
+  } else {
+    // Turn it off
+    batchUpdateMode = false;
+    batchSelectedNodes.clear();
+    batchSelectedTemplates.clear();
+    detailContent.innerHTML = '<p>Batch update mode OFF.</p>';
+  }
+});
+
+/* Stats button => toggles stats popup */
+statsBtn.addEventListener('click', ()=>{
+  if(statsPopup.style.display === 'none' || !statsPopup.style.display){
+    statsPopup.style.display = 'block';
+    loadStats();  // fetch stats and display
+  } else {
+    statsPopup.style.display = 'none';
+  }
+});
+
+/* Close stats popup */
+closeStatsPopupBtn.addEventListener('click', ()=>{
+  statsPopup.style.display = 'none';
+});
+
+/**********************************************************
+ * Editing mode (node vs. template)
+ **********************************************************/
+function setMode(m){
+  currentMode = m;
+  currentModeSpan.textContent = 'Mode: ' + m;
+  modeNodeBtn.classList.toggle('active', m==='node');
+  modeTemplateBtn.classList.toggle('active', m==='template');
+  detailContent.innerHTML = `Switched to "${m}" editing mode.`;
+}
+
+/**********************************************************
+ * Setting the visualization mode
+ **********************************************************/
+function setViewMode(m){
+  console.log('Switching to view mode:', m);
+  viewMode = m;
+
+  // Hide all panels
+  treeContainer.style.display = 'none';
+  templateListContainer.style.display = 'none';
+  mappingsListContainer.style.display = 'none';
+  typeListContainer.style.display = 'none';
+  eventListContainer.style.display = 'none';
+  mappingListContainer.style.display = 'none';
+  queryModeContainer.style.display = 'none';
+  queryFieldList.style.display = 'none';
+  zoomControlsDiv.style.display = 'none';
+
+  if(m === 'attribute' || m === 'type' || m === 'event' || m === 'mapping' || m === 'query'){
+    modeNodeBtn.disabled = true;
+    modeTemplateBtn.disabled = true;
+    deleteNodesBtn.disabled = true;
+  } else {
+    modeNodeBtn.disabled = false;
+    modeTemplateBtn.disabled = false;
+    deleteNodesBtn.disabled = false;
+  }
+
+  if(m === 'graph'){
+    treeContainer.style.display = 'block';
+    zoomControlsDiv.style.display = 'block';
+    detailContent.style.display = 'block';
+    detailContent.innerHTML = 'Switched to Graph view. Select a node.';
+  }
+  else if(m === 'template'){
+    templateListContainer.style.display = 'block';
+    detailContent.style.display = 'block';
+    detailContent.innerHTML = 'Switched to Template list view. Select a node.';
+    renderTemplateList();
+  }
+  else if(m === 'attribute'){
+    mappingsListContainer.style.display = 'block';
+    detailContent.style.display = 'block';
+    detailContent.innerHTML = 'Switched to Attribute view. Select a node.';
+    renderMappingsList();
+  }
+  else if(m === 'type'){
+    typeListContainer.style.display = 'block';
+    detailContent.style.display = 'block';
+    detailContent.innerHTML = 'Switched to Type view. Select a node.';
+    renderTypeList();
+  }
+  else if(m === 'event'){
+    eventListContainer.style.display = 'block';
+    detailContent.style.display = 'block';
+    detailContent.innerHTML = 'Switched to Event view. Select a template.';
+    renderEventList();
+  }
+  else if(m === 'mapping'){
+    mappingListContainer.style.display = 'block';
+    detailContent.style.display = 'block';
+    detailContent.innerHTML = 'Switched to Mapping view. Select an attribute or node.';
+    renderMappingList();
+  }
+  else if(m === 'query'){
+    queryModeContainer.style.display = 'block';
+    queryFieldList.style.display = 'block';
+    detailContent.style.display = 'none';  // we won't use detailContent in query mode
+    // load the field list & show the query UI
+    renderQueryUI();
+    loadQueryFields();
+  }
+}
+
+/**********************************************************
+ * Calls that do modifies (with optional reparse)
+ **********************************************************/
+async function apiModifyCall(url, options={}) {
+  url += (url.includes('?') ? '&' : '?') + 'reparse=' + (autoReparse ? 'true' : 'false');
+  return await apiCall(url, options);
+}
+
+/**********************************************************
+ * Loading overall data
+ **********************************************************/
+async function loadTree(){
+  detailContent.innerHTML = 'Loading tree…';
+  try {
+    let treeResp = await apiCall('/api/get_tree');
+    if(!treeResp.ok){
+      detailContent.innerHTML = 'Error loading tree.';
+      return;
+    }
+    rawTreeData = await treeResp.json();
+    renderTreeDagre(rawTreeData, 0);
+
+    // Also load templates
+    let atResp = await apiCall('/api/get_all_templates');
+    if(atResp.ok){
+      let data = await atResp.json();
+      allTemplates = data.templates || {};
+    } else {
+      allTemplates = {};
+    }
+
+    // Re-render if in certain modes
+    if(viewMode === 'attribute'){
+      renderMappingsList();
+    } else if(viewMode === 'type'){
+      renderTypeList();
+    } else if(viewMode === 'template'){
+      renderTemplateList();
+    } else if(viewMode === 'event'){
+      renderEventList();
+    } else if(viewMode === 'mapping'){
+      renderMappingList();
+    } else if(viewMode === 'query'){
+      renderQueryUI();
+    } else {
+      treeContainer.style.display = 'block';
+      zoomControlsDiv.style.display = 'block';
+      detailContent.innerHTML = 'Tree loaded. Select a node.';
+    }
+
+    detailContent.innerHTML = 'Tree loaded. Select a node.';
+  } catch(e){
+    console.error(e);
+    detailContent.innerHTML = 'Error loading tree.';
+  }
+}
+
+/**********************************************************
+ * Graph (Dagre)
+ **********************************************************/
+function buildHierarchy(nodeId, dict, visited=new Set()) {
+  if(!dict[nodeId] || visited.has(nodeId)) return null;
+  visited.add(nodeId);
+  const obj = dict[nodeId];
+  let children = [];
+  if(Array.isArray(obj.children)){
+    children = obj.children
+      .map(cId => buildHierarchy(cId, dict, visited))
+      .filter(x => x);
+  }
+  return {
+    nodeId,
+    value: obj.value,
+    is_variable: obj.is_variable,
+    regex: obj.regex,
+    trailing_whitespace: obj.trailing_whitespace,
+    is_end_of_template: obj.is_end_of_template,
+    children
+  };
+}
+
+function measureNode(n, ctx){
+  const line1 = `ID: ${n.nodeId}`;
+  const line2 = n.value || '';
+  const w1 = ctx.measureText(line1).width;
+  const w2 = ctx.measureText(line2).width;
+  let w = Math.max(w1, w2) + 20;
+  let h = 48;
+  return {
+    lines: [line1, line2],
+    width: w,
+    height: h
+  };
+}
+
+function renderTreeDagre(dict, rootId){
+  while(treeContainer.firstChild){
+    treeContainer.removeChild(treeContainer.firstChild);
+  }
+  const rootData = buildHierarchy(rootId, dict);
+  if(!rootData){
+    detailContent.innerHTML = `No root node with ID ${rootId}`;
+    return;
+  }
+  const g = new dagre.graphlib.Graph();
+  g.setGraph({rankdir:'LR', nodesep:50, ranksep:80, marginx:20, marginy:20});
+  g.setDefaultEdgeLabel(()=>({}));
+
+  // Flatten
+  let nodeList = [];
+  function walk(n){
+    nodeList.push(n);
+    (n.children||[]).forEach(c=> walk(c));
+  }
+  walk(rootData);
+
+  let canvas = document.createElement('canvas');
+  let ctx = canvas.getContext('2d');
+  ctx.font='14px sans-serif';
+
+  for(let nd of nodeList){
+    let box = measureNode(nd, ctx);
+    g.setNode(String(nd.nodeId), {
+      width: box.width,
+      height: box.height,
+      data: nd,
+      lines: box.lines
+    });
+  }
+
+  function addEdges(n){
+    for(let c of(n.children||[])){
+      g.setEdge(String(n.nodeId), String(c.nodeId));
+      addEdges(c);
+    }
+  }
+  addEdges(rootData);
+
+  dagre.layout(g);
+
+  let edgesG = makeSvgGroup(treeContainer, {class:'edgesG'});
+  let nodesG = makeSvgGroup(treeContainer, {class:'nodesG'});
+
+  let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
+
+  for(let e of g.edges()){
+    let edgeObj = g.edge(e);
+    let pts = edgeObj.points;
+    let pathStr = `M${pts[0].x},${pts[0].y}`;
+    minX = Math.min(minX, pts[0].x);
+    maxX = Math.max(maxX, pts[0].x);
+    minY = Math.min(minY, pts[0].y);
+    maxY = Math.max(maxY, pts[0].y);
+
+    for(let i=1;i<pts.length;i++){
+      let p = pts[i];
+      pathStr += ` L${p.x},${p.y}`;
+      minX = Math.min(minX, p.x);
+      maxX = Math.max(maxX, p.x);
+      minY = Math.min(minY, p.y);
+      maxY = Math.max(maxY, p.y);
+    }
+    let pathEl = document.createElementNS('http://www.w3.org/2000/svg','path');
+    pathEl.setAttribute('class','edgePath');
+    pathEl.setAttribute('d',pathStr);
+    edgesG.appendChild(pathEl);
+  }
+
+  nodeElementsById={};
+  for(let id of g.nodes()){
+    const meta = g.node(id);
+    const nd = meta.data;
+    const lines = meta.lines;
+    let left = meta.x - meta.width/2;
+    let top  = meta.y - meta.height/2;
+    minX = Math.min(minX, left);
+    maxX = Math.max(maxX, left+meta.width);
+    minY = Math.min(minY, top);
+    maxY = Math.max(maxY, top+meta.height);
+
+    let gNode = makeSvgGroup(nodesG, {class:'nodeGroup'});
+    gNode.setAttribute('transform', `translate(${left},${top})`);
+
+    let rect = document.createElementNS('http://www.w3.org/2000/svg','rect');
+    let rectCls = 'nodeRect';
+    if(nd.is_variable) rectCls += ' variable';
+    if(nd.is_end_of_template) rectCls += ' endTemplate';
+    rect.setAttribute('class', rectCls);
+    rect.setAttribute('width', meta.width);
+    rect.setAttribute('height', meta.height);
+    rect.addEventListener('click', ()=> handleNodeClick(nd));
+
+    let titleEl = document.createElementNS('http://www.w3.org/2000/svg','title');
+    titleEl.textContent = `Node ID: ${nd.nodeId}\nRegex: ${nd.regex}\nWhitespace: ${nd.trailing_whitespace||0}`;
+    rect.appendChild(titleEl);
+
+    gNode.appendChild(rect);
+
+    let txt1 = document.createElementNS('http://www.w3.org/2000/svg','text');
+    txt1.setAttribute('class','nodeLabel');
+    txt1.setAttribute('x', meta.width/2);
+    txt1.setAttribute('y', 16);
+    txt1.setAttribute('text-anchor','middle');
+    txt1.textContent = lines[0];
+    gNode.appendChild(txt1);
+
+    let txt2 = document.createElementNS('http://www.w3.org/2000/svg','text');
+    txt2.setAttribute('class','nodeLabel');
+    txt2.setAttribute('x', meta.width/2);
+    txt2.setAttribute('y', 32);
+    txt2.setAttribute('text-anchor','middle');
+    txt2.textContent = lines[1];
+    gNode.appendChild(txt2);
+
+    nodesG.appendChild(gNode);
+
+    nodeElementsById[nd.nodeId] = {
+      group: gNode,
+      rect,
+      finalX: 0,
+      finalY: 0,
+      rawX: meta.x,
+      rawY: meta.y
+    };
+  }
+
+  const margin = 40;
+  minX -= margin; minY -= margin;
+  maxX += margin; maxY += margin;
+  const totalWidth = (maxX - minX);
+  const totalHeight= (maxY - minY);
+
+  let wrapper = makeSvgGroup(treeContainer, {class:'wrapper'});
+  while(edgesG.firstChild){
+    wrapper.appendChild(edgesG.firstChild);
+  }
+  while(nodesG.firstChild){
+    wrapper.appendChild(nodesG.firstChild);
+  }
+  treeContainer.removeChild(edgesG);
+  treeContainer.removeChild(nodesG);
+
+  wrapper.setAttribute('transform', `translate(${-minX},${-minY}) scale(${globalZoom})`);
+  treeContainer.setAttribute('width', totalWidth*globalZoom);
+  treeContainer.setAttribute('height', totalHeight*globalZoom);
+
+  let factorX = globalZoom;
+  let factorY = globalZoom;
+  for(let id of g.nodes()){
+    let meta = g.node(id);
+    nodeElementsById[meta.data.nodeId].finalX = (meta.x - minX)*factorX;
+    nodeElementsById[meta.data.nodeId].finalY = (meta.y - minY)*factorY;
+  }
+
+  lastLayout = {
+    valid: true, minX, minY, maxX, maxY,
+    totalWidth: totalWidth*globalZoom, 
+    totalHeight: totalHeight*globalZoom
+  };
+}
+
+function makeSvgGroup(parent, attrs){
+  let g = document.createElementNS('http://www.w3.org/2000/svg','g');
+  for(const [k,v] of Object.entries(attrs)){
+    g.setAttribute(k, v);
+  }
+  parent.appendChild(g);
+  return g;
+}
+
+let globalZoom = 1.0;
+let lastLayout = {
+  valid: false,
+  minX: 0,
+  minY: 0,
+  maxX: 0,
+  maxY: 0,
+  totalWidth: 0,
+  totalHeight: 0
+};
+
+function doZoom(scaleFactor){
+  if(!lastLayout.valid){
+    globalZoom *= scaleFactor;
+    renderTreeDagre(rawTreeData, 0);
+    return;
+  }
+  const oldZoom = globalZoom;
+  const oldMinX = lastLayout.minX;
+  const oldMinY = lastLayout.minY;
+  let leftPanel = document.getElementById('leftPanel');
+  const centerX = leftPanel.scrollLeft + leftPanel.clientWidth/2;
+  const centerY = leftPanel.scrollTop  + leftPanel.clientHeight/2;
+  const localCenterX = centerX / oldZoom + oldMinX;
+  const localCenterY = centerY / oldZoom + oldMinY;
+
+  globalZoom *= scaleFactor;
+  renderTreeDagre(rawTreeData, 0);
+
+  const newMinX = lastLayout.minX;
+  const newMinY = lastLayout.minY;
+  const newCenterX = (localCenterX - newMinX)*globalZoom;
+  const newCenterY = (localCenterY - newMinY)*globalZoom;
+
+  leftPanel.scrollLeft = newCenterX - leftPanel.clientWidth/2;
+  leftPanel.scrollTop  = newCenterY - leftPanel.clientHeight/2;
+}
+
+treeContainer.addEventListener('wheel', (e)=>{
+  if(e.ctrlKey){
+    e.preventDefault();
+    let direction = (e.deltaY>0)? 'out':'in';
+    if(direction==='in'){
+      doZoom(1.1);
+    } else {
+      doZoom(1/1.1);
+    }
+  }
+}, {passive:false});
+
+zoomInBtn.addEventListener('click', ()=>{
+  doZoom(1.2);
+});
+zoomOutBtn.addEventListener('click', ()=>{
+  doZoom(1/1.2);
+});
+resetZoomBtn.addEventListener('click', ()=>{
+  globalZoom = 1.0;
+  renderTreeDagre(rawTreeData, 0);
+});
+
+/**********************************************************
+ * Stats
+ **********************************************************/
+async function loadStats(){
+  try{
+    let resp = await apiCall('/api/get_stats');
+    if(!resp.ok) return;
+    let data = await resp.json();
+    document.getElementById('statsPopupContent').innerHTML = `
+      <p>Matched lines: ${data.matched_count} / ${data.total_lines}
+       (${data.matched_percentage.toFixed(2)}%)</p>
+    `;
+  } catch(e){
+    console.error('Error loading stats', e);
+  }
+}
+
+/**********************************************************
+ * Deletion
+ **********************************************************/
+deleteNodesBtn.addEventListener('click', ()=>{
+  if(!deleteMode){
+    deleteMode = true;
+    detailContent.innerHTML = '<p>Delete mode ON. Click nodes (in the graph or template view) to select them, then click "Delete Nodes" again to confirm.</p>';
+  } else {
+    if(selectedForDeletion.size === 0){
+      detailContent.innerHTML = '<p>No nodes selected for deletion.</p>';
+    } else {
+      if(confirm(`Really delete ${selectedForDeletion.size} node(s)?`)){
+        deleteSelectedNodes();
+      } else {
+        detailContent.innerHTML = '<p>Deletion canceled.</p>';
+      }
+    }
+    // turn off delete mode
+    deleteMode = false;
+    for(let nid of selectedForDeletion){
+      unhighlightNode(nid);
+      unhighlightListNode(nid);
+    }
+    selectedForDeletion.clear();
+  }
+});
+
+async function deleteSelectedNodes(){
+  const node_ids = Array.from(selectedForDeletion);
+  try{
+    let resp = await apiModifyCall('/api/del_nodes', {
+      method:'DELETE',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ node_ids })
+    });
+    if(!resp.ok){
+      detailContent.innerHTML = '<p style="color:red;">Delete failed.</p>';
+      return;
+    }
+    detailContent.innerHTML = '<p style="color:green;">Nodes deleted successfully.</p>';
+    loadTree();
+  } catch(e){
+    detailContent.innerHTML = `<p style="color:red;">Error: ${escapeHtml(e.toString())}</p>`;
+    console.error(e);
+  }
+}
+
+function highlightNode(nid){
+  let el = nodeElementsById[nid];
+  if(el && el.rect){
+    el.rect.classList.add('deleteCandidate');
+  }
+}
+function unhighlightNode(nid){
+  let el = nodeElementsById[nid];
+  if(el && el.rect){
+    el.rect.classList.remove('deleteCandidate');
+  }
+}
+function unhighlightListNode(nid){
+  let nodeSpans = document.querySelectorAll(`.templateNode[data-nodeid="${nid}"]`);
+  nodeSpans.forEach(sp => sp.classList.remove('deleteCandidateText'));
+}
+
+/**********************************************************
+ * Node click handling
+ **********************************************************/
+function handleNodeClick(nodeData){
+  if(deleteMode){
+    if(selectedForDeletion.has(nodeData.nodeId)){
+      selectedForDeletion.delete(nodeData.nodeId);
+      unhighlightNode(nodeData.nodeId);
+    } else {
+      selectedForDeletion.add(nodeData.nodeId);
+      highlightNode(nodeData.nodeId);
+    }
+  } else if(batchUpdateMode){
+    if(viewMode==='attribute' || viewMode==='type'){
+      if(batchSelectedNodes.has(nodeData.nodeId)){
+        batchSelectedNodes.delete(nodeData.nodeId);
+      } else {
+        batchSelectedNodes.add(nodeData.nodeId);
+      }
+      updateBatchDetailPanel();
+    } else {
+      detailContent.innerHTML = 'Batch mode for nodes is only relevant in attribute or type modes.';
+    }
+  } else {
+    if(currentMode==='node'){
+      showNodeEditor(nodeData.nodeId);
+    } else {
+      // if template mode:
+      if(nodeData.is_end_of_template){
+        pickTemplate(nodeData.nodeId);
+      } else {
+        detailContent.innerHTML = 'This node is not an end-of-template.';
+      }
+    }
+  }
+}
+
+/**********************************************************
+ * Helpers
+ **********************************************************/
+function showLoadingOverlay(){
+  loadingOverlay.style.display = 'flex';
+}
+function hideLoadingOverlay(){
+  loadingOverlay.style.display = 'none';
+}
+async function apiCall(url, options={}){
+  showLoadingOverlay();
+  try{
+    return await fetch(url, options);
+  } finally {
+    hideLoadingOverlay();
+  }
+}
+function escapeHtml(s){
+  if(typeof s!=='string')return'';
+  return s
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+
+/**********************************************************
+ * Node Editor
+ **********************************************************/
+async function showNodeEditor(nodeId){
+  try{
+    let r = await apiCall(`/api/get_node/${nodeId}`);
+    if(!r.ok) throw new Error('Failed /api/get_node');
+    let nodeInfo = await r.json();
+    detailContent.innerHTML = buildNodeEditorHtml(nodeInfo);
+
+    const editValue = document.getElementById('editValue');
+    const editIsVar = document.getElementById('editIsVar');
+    const editRegex = document.getElementById('editRegex');
+    const editWhitespace = document.getElementById('editWhitespace');
+    const editParentId = document.getElementById('editParentId');
+    const statusDiv = document.getElementById('editStatus');
+    const addNodeFormContainer = document.getElementById('addNodeFormContainer');
+
+    const saveNodeBtn = document.getElementById('saveNodeBtn');
+    const forceNodeBtn= document.getElementById('forceNodeBtn');
+    if(saveNodeBtn){
+      saveNodeBtn.addEventListener('click', async()=>{
+        const res = await setNode(nodeInfo.id, {
+          id: nodeInfo.id,
+          value: editValue.value,
+          is_variable: editIsVar.checked,
+          regex: editRegex.value,
+          trailing_whitespace: parseInt(editWhitespace.value,10)||0,
+          new_parent: parseInt(editParentId.value,10)||null
+        }, false);
+        handleSetNodeResult(res, statusDiv);
+      });
+    }
+    if(forceNodeBtn){
+      forceNodeBtn.addEventListener('click', async()=>{
+        const res = await setNode(nodeInfo.id, {
+          id: nodeInfo.id,
+          value: editValue.value,
+          is_variable: editIsVar.checked,
+          regex: editRegex.value,
+          trailing_whitespace: parseInt(editWhitespace.value,10)||0,
+          new_parent: parseInt(editParentId.value,10)||null
+        }, true);
+        handleSetNodeResult(res, statusDiv);
+      });
+    }
+
+    const focusNodeBtn = document.getElementById('focusNodeBtn');
+    if(focusNodeBtn){
+      focusNodeBtn.addEventListener('click', ()=>{
+        centerGraphOnNode(nodeInfo.id);
+      });
+    }
+
+    const addChildNodeBtn = document.getElementById('addChildNodeBtn');
+    if(addChildNodeBtn){
+      addChildNodeBtn.addEventListener('click', ()=>{
+        const defChildren = (rawTreeData[nodeInfo.id] && rawTreeData[nodeInfo.id].children)||[];
+        const childrenStr = defChildren.join(',');
+        addNodeFormContainer.innerHTML = `
+          <h4>Add a New Child Node</h4>
+          <div class="formRow">
+            <label>Value:</label>
+            <input type="text" id="newValue"/>
+          </div>
+          <div class="formRow">
+            <label>Is Variable?</label>
+            <input type="checkbox" id="newIsVar"/>
+          </div>
+          <div class="formRow">
+            <label>Regex:</label>
+            <input type="text" id="newRegex"/>
+          </div>
+          <div class="formRow">
+            <label>Trailing Whitespace:</label>
+            <input type="number" id="newTrailingWhitespace" value="0"/>
+          </div>
+          <div class="formRow">
+            <label>Children IDs:</label>
+            <input type="text" id="childrenInput" value="${childrenStr}"/>
+          </div>
+          <button id="confirmAddNodeBtn" style="background:#dfd;">Confirm Add</button>
+        `;
+        document.getElementById('confirmAddNodeBtn').addEventListener('click', async()=>{
+          const cVal = document.getElementById('newValue').value;
+          const cIsVar = document.getElementById('newIsVar').checked;
+          const cRegex = document.getElementById('newRegex').value;
+          const cWs = parseInt(document.getElementById('newTrailingWhitespace').value,10)||0;
+          const rawChildren = document.getElementById('childrenInput').value.trim();
+          const childrenIds = rawChildren ? rawChildren.split(',').map(x=>parseInt(x.trim())).filter(x=>!isNaN(x)) : [];
+          const payload = {
+            new_node: {
+              is_variable: cIsVar,
+              value: cVal,
+              regex: cRegex,
+              trailing_whitespace: cWs
+            },
+            parent: nodeInfo.id,
+            children: childrenIds
+          };
+          let res = await apiModifyCall('/api/add_node',{
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify(payload)
+          });
+          if(!res.ok){
+            addNodeFormContainer.innerHTML = '<p style="color:red;">Add node failed.</p>';
+            return;
+          }
+          addNodeFormContainer.innerHTML = '<p style="color:green;">Node added successfully.</p>';
+          loadTree();
+        });
+      });
+    }
+
+  } catch(e){
+    console.error(e);
+    detailContent.innerHTML = `<p style="color:red;">Error loading node editor: ${escapeHtml(String(e))}</p>`;
+  }
+}
+
+function buildNodeEditorHtml(nodeInfo, readOnly=false){
+  let observedHtml = '';
+  if(nodeInfo.values_set && nodeInfo.values_set.length>0){
+    observedHtml = '<ul>';
+    for(let val of nodeInfo.values_set){
+      if(Array.isArray(val)){
+        observedHtml += `<li>${escapeHtml(val[0])} (count: ${val[1]})</li>`;
+      } else {
+        observedHtml += `<li>${escapeHtml(val)}</li>`;
+      }
+    }
+    observedHtml += '</ul>';
+  } else {
+    observedHtml = `<p style="color:#999;">No observed values</p>`;
+  }
+
+  let templHtml = '';
+  if(nodeInfo.containing_templates && nodeInfo.containing_templates.length>0){
+    const lines = nodeInfo.containing_templates.map(tid=> renderTemplateLine(tid));
+    templHtml = lines.map(l=>`<div>${l}</div>`).join('');
+  } else {
+    templHtml = `<p style="color:#999;">None found</p>`;
+  }
+
+  const roAttr = readOnly ? 'readonly' : '';
+  const roChk  = readOnly ? 'disabled' : '';
+  let btnsHtml = '';
+  let addNodeBtnHtml = '';
+  if(!readOnly){
+    btnsHtml = `
+      <div style="margin-top:1rem;">
+        <button id="saveNodeBtn">Save</button>
+        <button id="forceNodeBtn">Force Save</button>
+      </div>
+      <div style="margin-top:1rem;">
+        <button id="focusNodeBtn">Focus Graph on This Node</button>
+      </div>
+    `;
+    addNodeBtnHtml = `
+      <hr/>
+      <div style="margin-top:1rem;">
+        <button id="addChildNodeBtn" style="background:#efe;">Add Node Under This One</button>
+      </div>
+    `;
+  } else {
+    btnsHtml = `
+      <div style="margin-top:1rem;">
+        <button id="focusNodeBtn">Focus Graph on This Node</button>
+      </div>
+    `;
+  }
+
+  return `
+    <h4>${readOnly?'View':'Edit'} Node (ID ${nodeInfo.id})</h4>
+    <div class="formRow">
+      <label>Value:</label>
+      <input type="text" id="editValue" ${roAttr} value="${escapeHtml(nodeInfo.value)}"/>
+    </div>
+    <div class="formRow">
+      <label>Is Variable?</label>
+      <input type="checkbox" id="editIsVar" ${roChk} ${nodeInfo.is_variable?'checked':''}/>
+    </div>
+    <div class="formRow">
+      <label>Regex:</label>
+      <input type="text" id="editRegex" ${roAttr} value="${escapeHtml(nodeInfo.regex||'')}"/>
+    </div>
+    <div class="formRow">
+      <label>Trailing Whitespace:</label>
+      <input type="number" id="editWhitespace" ${roAttr} value="${nodeInfo.trailing_whitespace||0}"/>
+    </div>
+    <div class="formRow">
+      <label>New Parent ID:</label>
+      <input type="number" id="editParentId" ${roAttr} value="${nodeInfo.parent_id||''}"/>
+    </div>
+    ${btnsHtml}
+    <hr/>
+    <div class="formRow">
+      <label>Observed Values:</label>
+      <div id="observedValues">${observedHtml}</div>
+    </div>
+    <div class="formRow">
+      <label>Containing Templates (up to 5):</label>
+      <div id="nodeTemplatesList">${templHtml}</div>
+    </div>
+    ${addNodeBtnHtml}
+    <div id="editStatus"></div>
+    <div id="addNodeFormContainer"></div>
+  `;
+}
+
+async function setNode(nodeId, payload, force){
+  const resp = await apiModifyCall(`/api/set_node/${nodeId}`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ node: payload, force })
+  });
+  return await resp.json();
+}
+function handleSetNodeResult(result, container){
+  if(Array.isArray(result) && result.length===0){
+    container.innerHTML = '<p style="color:green;">Node saved successfully.</p>';
+    loadTree();
+  } else if(Array.isArray(result) && result.length>0){
+    container.innerHTML = `<p style="color:red;">Some lines no longer match:</p><pre>${JSON.stringify(result,null,2)}</pre>`;
+  } else {
+    container.innerHTML = '<p style="color:red;">Unexpected response.</p>';
+  }
+}
+
+/**********************************************************
+ * Template Edition
+ **********************************************************/
+function renderTemplateList(){
+  let sortedKeys = Object.keys(allTemplates)
+    .map(k=> parseInt(k,10))
+    .sort((a,b)=> a-b);
+
+  let html = '';
+  for(let tid of sortedKeys){
+    let tObj = allTemplates[tid];
+    let nodes = tObj.nodes || [];
+    html += `<div class="templateItem">
+      <span class="templateId" data-templateid="${tid}">#${tid}</span>
+      <span class="separator">:</span>
+      <span class="templateNodes">
+    `;
+    nodes.forEach((n, idx)=>{
+      let color = n.is_variable ? 'blue' : 'goldenrod';
+      let val   = escapeHtml(n.value || '(empty)');
+      let hover = `ID: ${n.id}, Regex: ${n.regex}, WS: ${n.trailing_whitespace}, Var: ${n.is_variable}`;
+      html += `<span class="templateNode"
+                     data-nodeid="${n.id}"
+                     style="color:${color}"
+                     title="${escapeHtml(hover)}"
+                >
+                ${val}
+               </span>`;
+      if(idx < nodes.length-1){
+        html += `<span class="separator"> | </span>`;
+      }
+    });
+    html += `</span></div>`;
+  }
+  templateListContainer.innerHTML = html;
+
+  templateListContainer.removeEventListener('click', onTemplateListClick, false);
+  templateListContainer.addEventListener('click', onTemplateListClick);
+}
+
+function onTemplateListClick(e){
+  const targ = e.target;
+  if(targ.classList.contains('templateId')){
+    let tid = parseInt(targ.dataset.templateid,10);
+    if(!isNaN(tid)) showTemplateEditorById(tid);
+    return;
+  }
+  if(targ.classList.contains('templateNode')){
+    let nid = parseInt(targ.dataset.nodeid,10);
+    if(isNaN(nid)) return;
+    if(deleteMode){
+      if(selectedForDeletion.has(nid)){
+        selectedForDeletion.delete(nid);
+        targ.classList.remove('deleteCandidateText');
+      } else {
+        selectedForDeletion.add(nid);
+        targ.classList.add('deleteCandidateText');
+      }
+    } else if(batchUpdateMode){
+      if(batchSelectedNodes.has(nid)){
+        batchSelectedNodes.delete(nid);
+        targ.classList.remove('deleteCandidateText');
+      } else {
+        batchSelectedNodes.add(nid);
+        targ.classList.add('deleteCandidateText');
+      }
+      updateBatchDetailPanel();
+    } else {
+      showNodeEditor(nid);
+    }
+  }
+}
+
+function renderTemplateLine(tid){
+  const tObj = allTemplates[tid];
+  if(!tObj) return `#${tid} (not found)`;
+  const nodes = tObj.nodes || [];
+  let h = `<span class="templateId" data-templateid="${tid}">#${tid}</span>
+          <span class="separator">: </span>
+          <span class="templateNodes">`;
+  nodes.forEach((n, idx)=>{
+    let color = n.is_variable ? 'blue':'goldenrod';
+    let val   = escapeHtml(n.value || '(empty)');
+    let hover = `ID: ${n.id}, Regex: ${n.regex}, WS: ${n.trailing_whitespace}, Var: ${n.is_variable}`;
+    h += `<span class="templateNode" data-nodeid="${n.id}"
+                style="color:${color}"
+                title="${escapeHtml(hover)}"
+          >
+          ${val}
+          </span>`;
+    if(idx < nodes.length-1) h += `<span class="separator"> | </span>`;
+  });
+  h += `</span>`;
+  return h;
+}
+
+async function pickTemplate(endNodeId){
+  detailContent.innerHTML = `Looking up template(s) for node ${endNodeId}…`;
+  try{
+    let r = await apiCall(`/api/find_templates_ending_in/${endNodeId}`);
+    if(!r.ok){
+      detailContent.innerHTML = `<p style="color:red;">Error retrieving templates for node ${endNodeId}.</p>`;
+      return;
+    }
+    let candidates = await r.json();
+    if(candidates.length===0){
+      detailContent.innerHTML = `<p style="color:red;">No template ends in node ${endNodeId}.</p>`;
+      return;
+    }
+    showTemplateEditorById(candidates[0]);
+  } catch(e){
+    console.error(e);
+    detailContent.innerHTML = `<p style="color:red;">Error retrieving template info for node ${endNodeId}.</p>`;
+  }
+}
+
+async function showTemplateEditorById(templateId){
+  detailContent.innerHTML = `Loading template #${templateId}...`;
+  if(allTemplates[templateId]){
+    let {nodes, matched_lines} = allTemplates[templateId];
+    showTemplateEditor(templateId, nodes, matched_lines);
+  } else {
+    try{
+      let tResp = await apiCall(`/api/get_template/${templateId}`);
+      let mlResp= await apiCall(`/api/get_template_matches/${templateId}`);
+      if(!tResp.ok){
+        detailContent.innerHTML = `<p style="color:red;">Failed to load template #${templateId}.</p>`;
+        return;
+      }
+      let templateNodes = await tResp.json();
+      let matchedLines=[];
+      if(mlResp.ok){
+        matchedLines = await mlResp.json();
+      }
+      showTemplateEditor(templateId, templateNodes, matchedLines);
+    } catch(e){
+      detailContent.innerHTML = `<p style="color:red;">Error: ${escapeHtml(String(e))}</p>`;
+      console.log(e);
+    }
+  }
+}
+
+function showTemplateEditor(templateId, templateNodes, matchedLines){
+  const linesHtml = (matchedLines||[]).slice(0,100)
+    .map(l=>`<div>${escapeHtml(l)}</div>`).join('');
+  const nodeListHtml = templateNodes.map(n=>{
+    const color = n.is_variable?'blue':'goldenrod';
+    const hover = `ID: ${n.id}, Regex: ${n.regex}, WS: ${n.trailing_whitespace}, Var: ${n.is_variable}`;
+    const val   = n.value||'(empty)';
+    return `<span style="color:${color}; margin-right:0.3em;" title="${escapeHtml(hover)}"
+                class="templateNode singleTemplatePreview" data-nodeid="${n.id}">
+              ${escapeHtml(val)}
+            </span>`;
+  }).join('<span style="color:#999;"> | </span>');
+
+  detailContent.innerHTML = `
+    <h4>Template #${templateId}</h4>
+    <b>Nodes in path:</b>
+    <div style="margin-left:1em; margin-bottom:1em;">
+      ${nodeListHtml}
+    </div>
+    <b>Matched lines (up to 100):</b>
+    <div style="max-height:200px; overflow-y:auto; border:1px solid #ccc; margin-bottom:1em;">
+      ${linesHtml}
+    </div>
+    <button id="editTemplateBtn">Edit Template</button>
+    <button id="deleteTemplateBtn">Delete Template</button>
+    <button id="focusTemplateBtn" style="margin-left:1em;">Focus on Last Node</button>
+    <div id="templateEditorArea"></div>
+  `;
+
+  document.getElementById('deleteTemplateBtn').addEventListener('click', async()=>{
+    if(!confirm(`Delete template #${templateId}?`)) return;
+    let delResp = await apiModifyCall(`/api/del_template/${templateId}`, {method:'DELETE'});
+    if(!delResp.ok){
+      detailContent.innerHTML = '<p style="color:red;">Delete failed.</p>';
+    } else {
+      detailContent.innerHTML = '<p style="color:green;">Template deleted.</p>';
+      loadTree();
+    }
+  });
+
+  document.getElementById('focusTemplateBtn').addEventListener('click', ()=>{
+    if(templateNodes && templateNodes.length>0){
+      let lastNodeId = templateNodes[templateNodes.length-1].id;
+      centerGraphOnNode(lastNodeId);
+    }
+  });
+
+  document.getElementById('editTemplateBtn').addEventListener('click', ()=>{
+    let edArea = document.getElementById('templateEditorArea');
+    edArea.innerHTML = `
+      <p>Edit JSON, then click either "Save Template (Set)" or "Add as New Template".</p>
+      <textarea id="templateJson" rows="10" style="width:90%;">
+${JSON.stringify(templateNodes,null,2)}</textarea>
+      <br/>
+      <button id="saveTemplateEditsBtn" style="background:#dfd;">Save Template (Set)</button>
+      <button id="addTemplateBtn" style="background:#ffd;">Add as New Template</button>
+      <div id="templateEditorStatus"></div>
+    `;
+    document.getElementById('saveTemplateEditsBtn').addEventListener('click', async()=>{
+      const raw = document.getElementById('templateJson').value;
+      try{
+        const newTemp = JSON.parse(raw);
+        let setR = await apiModifyCall(`/api/set_template/${templateId}`, {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify(newTemp)
+        });
+        if(!setR.ok){
+          document.getElementById('templateEditorStatus').innerHTML = '<p style="color:red;">Set Template failed.</p>';
+          return;
+        }
+        const matched = await setR.json();
+        if(Array.isArray(matched) && matched.length===0){
+          document.getElementById('templateEditorStatus').innerHTML =
+            `<p style="color:red;">No lines matched this template. Adjust and try again.</p>`;
+          return;
+        }
+        document.getElementById('templateEditorStatus').innerHTML =
+          `<p style="color:green;">Template updated. Matched lines below:</p>
+           <pre>${JSON.stringify(matched,null,2)}</pre>`;
+        loadTree();
+      } catch(err){
+        document.getElementById('templateEditorStatus').innerHTML =
+          `<p style="color:red;">Error: ${escapeHtml(String(err))}</p>`;
+      }
+    });
+
+    document.getElementById('addTemplateBtn').addEventListener('click', async()=>{
+      const raw=document.getElementById('templateJson').value;
+      try{
+        const newTemp=JSON.parse(raw);
+        let addR=await apiModifyCall('/api/add_template',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify(newTemp)
+        });
+        if(!addR.ok){
+          document.getElementById('templateEditorStatus').innerHTML='<p style="color:red;">Add Template failed.</p>';
+          return;
+        }
+        const matched=await addR.json();
+        if(Array.isArray(matched)&&matched.length===0){
+          document.getElementById('templateEditorStatus').innerHTML=
+            `<p style="color:red;">No lines matched this new template. Please update and try again.</p>`;
+          return;
+        }
+        document.getElementById('templateEditorStatus').innerHTML=
+          `<p style="color:green;">New template added. Matched lines:</p>
+           <pre>${JSON.stringify(matched,null,2)}</pre>`;
+        loadTree();
+      } catch(err){
+        document.getElementById('templateEditorStatus').innerHTML=
+          `<p style="color:red;">Error: ${escapeHtml(String(err))}</p>`;
+      }
+    });
+  });
+
+  if(allTemplates[templateId] && allTemplates[templateId].line_ids){
+    addOverlappingTemplatesUI(templateId);
+  }
+}
+
+function addOverlappingTemplatesUI(currTid){
+  const currObj = allTemplates[currTid];
+  if(!currObj) return;
+  const Tset = new Set(currObj.line_ids||[]);
+  if(Tset.size===0) return;
+  const subList=[], supList=[], partialList=[];
+
+  for(let k in allTemplates){
+    let tid = parseInt(k,10);
+    if(tid===currTid) continue;
+    let that = allTemplates[k];
+    let Xset = new Set(that.line_ids||[]);
+    let intersection = new Set([...Tset].filter(x=>Xset.has(x)));
+    if(intersection.size===0) continue;
+
+    let TcapturesX = [...Xset].every(x=>Tset.has(x));
+    let XcapturesT = [...Tset].every(x=>Xset.has(x));
+
+    if(TcapturesX && !XcapturesT){
+      subList.push(tid);
+    } else if(!TcapturesX && XcapturesT){
+      supList.push(tid);
+    } else if(TcapturesX && XcapturesT){
+      subList.push(tid);
+      supList.push(tid);
+    } else {
+      partialList.push(tid);
+    }
+  }
+
+  let html=`
+    <hr/>
+    <h4>Overlapping Templates</h4>
+    <div style="margin:1em 0;">
+  `;
+  if(subList.length>0){
+    html += `<h5>Templates fully captured by this template:</h5>`;
+    subList.forEach(tid=>{
+      html+= `<div>${renderTemplateLine(tid)}</div>`;
+    });
+  }
+  if(supList.length>0){
+    html += `<h5>Templates that fully capture this template:</h5>`;
+    supList.forEach(tid=>{
+      html+= `<div>${renderTemplateLine(tid)}</div>`;
+    });
+  }
+  if(partialList.length>0){
+    html += `<h5>Overlap but partial:</h5>`;
+    partialList.forEach(tid=>{
+      html+= `<div>${renderTemplateLine(tid)}</div>`;
+    });
+  }
+  if(subList.length===0 && supList.length===0 && partialList.length===0){
+    html += `<p>No overlapping templates found.</p>`;
+  }
+  html += `</div>`;
+
+  let templateEditorArea = document.getElementById('templateEditorArea');
+  templateEditorArea.insertAdjacentHTML('beforeend', html);
+}
+
+/**********************************************************
+ * Attribute (Mappings) List
+ **********************************************************/
+async function renderMappingsList(){
+  await loadAllNodes();
+  doRenderMappingsList();
+}
+
+async function loadAllNodes(){
+  let r = await apiCall('/api/get_all_nodes');
+  if(!r.ok) throw new Error('Failed to load all nodes');
+  let data = await r.json();
+  allNodes = data;
+}
+
+function doRenderMappingsList(){
+  let container = mappingsListContainer;
+  container.innerHTML = '<h3>Attribute List</h3>';
+
+  let grouped = {};
+  for(let nid in allNodes){
+    let n = allNodes[nid];
+    if (!n.is_variable) continue;
+    let an = n.attribute_name || 'unmapped';
+    if(!grouped[an]) grouped[an] = [];
+    grouped[an].push(parseInt(nid,10));
+  }
+
+  let attrNames = Object.keys(grouped).sort();
+  attrNames.forEach(an => {
+    let section = document.createElement('div');
+    section.classList.add('attributeSection');
+    section.dataset.attrName = an;
+
+    let header = document.createElement('div');
+    header.classList.add('attributeHeader');
+
+    let toggleBtn = document.createElement('span');
+    toggleBtn.textContent = '[+]';
+    toggleBtn.classList.add('attributeToggleBtn');
+
+    let nameSpan = document.createElement('span');
+    nameSpan.textContent = ' ' + an + ' ';
+    nameSpan.classList.add('attributeName');
+    nameSpan.dataset.attrName = an;
+
+    nameSpan.addEventListener('click', (e)=>{
+      if(batchUpdateMode){
+        let nodeList = grouped[an];
+        for(let nodeId of nodeList){
+          batchSelectedNodes.add(nodeId);
+        }
+        updateBatchDetailPanel();
+      } else {
+        let oldName = an;
+        let newName = prompt(`Rename attribute '${oldName}' to?`, oldName);
+        if(newName===null) return;
+        renameAllNodesForAttribute(oldName, newName);
+      }
+    });
+
+    header.appendChild(toggleBtn);
+    header.appendChild(nameSpan);
+    section.appendChild(header);
+
+    let listContainer = document.createElement('div');
+    listContainer.classList.add('attributeNodes');
+    listContainer.style.display = 'none';
+
+    let ul = document.createElement('ul');
+    grouped[an].forEach(nodeId => {
+      let n = allNodes[nodeId];
+      let li = document.createElement('li');
+      let nodeSpan = document.createElement('span');
+      nodeSpan.classList.add('mappingNode');
+      nodeSpan.dataset.nodeid = nodeId;
+      nodeSpan.textContent = `${nodeId}: ${n.value||''}`;
+      nodeSpan.title = `ID: ${nodeId}\nRegex: ${n.regex}\nType: ${n.type}\nIsVar: ${n.is_variable}\nDescription: ${n.description||''}`;
+      nodeSpan.addEventListener('click', ()=>{
+        if(deleteMode){
+          if(selectedForDeletion.has(nodeId)){
+            selectedForDeletion.delete(nodeId);
+            nodeSpan.classList.remove('deleteCandidateText');
+          } else {
+            selectedForDeletion.add(nodeId);
+            nodeSpan.classList.add('deleteCandidateText');
+          }
+        } else if(batchUpdateMode){
+          if(batchSelectedNodes.has(nodeId)){
+            batchSelectedNodes.delete(nodeId);
+            nodeSpan.classList.remove('deleteCandidateText');
+          } else {
+            batchSelectedNodes.add(nodeId);
+            nodeSpan.classList.add('deleteCandidateText');
+          }
+          updateBatchDetailPanel();
+        } else {
+          showAttributeEditor(nodeId);
+        }
+      });
+      ul.appendChild(li);
+      li.appendChild(nodeSpan);
+    });
+    listContainer.appendChild(ul);
+    section.appendChild(listContainer);
+
+    toggleBtn.addEventListener('click', ()=>{
+      if(listContainer.style.display === 'none'){
+        listContainer.style.display = 'block';
+        toggleBtn.textContent = '[-]';
+      } else {
+        listContainer.style.display = 'none';
+        toggleBtn.textContent = '[+]';
+      }
+    });
+
+    container.appendChild(section);
+  });
+}
+
+function renameAllNodesForAttribute(oldName, newName){
+  let nodeList = [];
+  let nodesData= [];
+  for(let nid in allNodes){
+    let n = allNodes[nid];
+    let attr = n.attribute_name || '';
+    if(attr === oldName){
+      nodeList.push(parseInt(nid,10));
+      nodesData.push({
+        attribute_name: newName,
+        description: n.description || ''
+      });
+    }
+  }
+  if(nodeList.length===0){
+    alert(`No nodes with attribute '${oldName}'.`);
+    return;
+  }
+  apiModifyCall('/api/batch_set_node_semantics', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ node_ids: nodeList, nodes: nodesData })
+  })
+  .then(resp=>{
+    if(!resp.ok) throw new Error("Batch rename failed");
+    return resp.json();
+  })
+  .then(()=>{
+    detailContent.innerHTML = `<p style="color:green;">Renamed attribute '${oldName}' to '${newName}' on ${nodeList.length} node(s).</p>`;
+    renderMappingsList();
+  })
+  .catch(e=>{
+    console.error(e);
+    detailContent.innerHTML = `<p style="color:red;">Error renaming attribute: ${escapeHtml(String(e))}</p>`;
+  });
+}
+
+async function showAttributeEditor(nodeId){
+  try{
+    let nodeResp = await apiCall(`/api/get_node/${nodeId}`);
+    if(!nodeResp.ok){
+      detailContent.innerHTML = `<p style="color:red;">Failed to fetch node info.</p>`;
+      return;
+    }
+    let nodeData = await nodeResp.json();
+
+    let html = buildNodeEditorHtml(nodeData, true);
+
+    html += `
+      <hr/>
+      <h4>Attribute Semantics</h4>
+      <div class="formRow">
+        <label>Type:</label>
+        <span>${escapeHtml(nodeData.type||'')}</span>
+      </div>
+      <div class="formRow">
+        <label>Attribute Name:</label>
+        <input type="text" id="attrNameInput" value="${escapeHtml(nodeData.attribute_name||'')}"/>
+      </div>
+      <div class="formRow">
+        <label>Description:</label>
+        <textarea id="attrDescInput" rows="4" cols="40">${escapeHtml(nodeData.description||'')}</textarea>
+      </div>
+      <button id="saveAttrSemanticsBtn" style="margin-top:1em; background:#dfd;">
+        Save Semantics
+      </button>
+      <div id="attributeEditorStatus"></div>
+    `;
+    detailContent.innerHTML = html;
+
+    const saveAttrSemanticsBtn = document.getElementById('saveAttrSemanticsBtn');
+    saveAttrSemanticsBtn.addEventListener('click', async()=>{
+      const newAttrName = document.getElementById('attrNameInput').value.trim();
+      const newDesc     = document.getElementById('attrDescInput').value.trim();
+      try{
+        await saveNodeSemantics(nodeId, newAttrName, newDesc);
+        document.getElementById('attributeEditorStatus').innerHTML = '<p style="color:green;">Saved.</p>';
+      }catch(e){
+        document.getElementById('attributeEditorStatus').innerHTML = `<p style="color:red;">Error: ${escapeHtml(String(e))}</p>`;
+      }
+    });
+  } catch(e){
+    detailContent.innerHTML = `<p style="color:red;">Error while loading attribute editor: ${escapeHtml(String(e))}</p>`;
+  }
+}
+
+function saveNodeSemantics(nodeId, attribute_name, description){
+  return apiModifyCall(`/api/set_node_semantics/${nodeId}`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ attribute_name, description })
+  })
+  .then(resp=>{
+    if(!resp.ok) throw new Error("Set node semantics failed");
+    return resp.json();
+  })
+  .then(()=>{
+    if(viewMode==='attribute'){
+      return loadAllNodes().then(()=> doRenderMappingsList());
+    }
+  });
+}
+
+/**********************************************************
+ * Type List
+ **********************************************************/
+async function renderTypeList(){
+  await loadAllNodes();
+  await loadAllTypes();
+  doRenderTypeList();
+}
+
+async function loadAllTypes(){
+  let r = await apiCall('/api/get_types');
+  if(!r.ok) throw new Error('Failed to load types');
+  allTypes = await r.json();
+}
+
+function doRenderTypeList(){
+  let container = typeListContainer;
+  container.innerHTML = '<h3>Type List</h3>';
+
+  let grouped = {};
+  for(let nid in allNodes){
+    let n = allNodes[nid];
+    if (!n.is_variable) continue;
+    let t = n.type || "none_t";
+    if(!grouped[t]) grouped[t] = [];
+    grouped[t].push(parseInt(nid,10));
+  }
+
+  let typeNames = Object.keys(grouped).sort();
+  typeNames.forEach(tt => {
+    let section = document.createElement('div');
+    section.classList.add('attributeSection');
+    section.dataset.typeName = tt;
+
+    let header = document.createElement('div');
+    header.classList.add('attributeHeader');
+
+    let toggleBtn = document.createElement('span');
+    toggleBtn.textContent = '[+]';
+    toggleBtn.classList.add('attributeToggleBtn');
+
+    let nameSpan = document.createElement('span');
+    nameSpan.textContent = ' ' + tt + ' ';
+    nameSpan.classList.add('attributeName');
+    nameSpan.dataset.typeName = tt;
+
+    header.appendChild(toggleBtn);
+    header.appendChild(nameSpan);
+    section.appendChild(header);
+
+    let listContainer = document.createElement('div');
+    listContainer.classList.add('attributeNodes');
+    listContainer.style.display = 'none';
+
+    let ul = document.createElement('ul');
+    grouped[tt].forEach(nodeId => {
+      let n = allNodes[nodeId];
+      let li = document.createElement('li');
+      let nodeSpan = document.createElement('span');
+      nodeSpan.classList.add('mappingNode');
+      nodeSpan.dataset.nodeid = nodeId;
+      nodeSpan.textContent = `${nodeId}: ${n.value||''}`;
+      nodeSpan.title = `ID: ${nodeId}\nRegex: ${n.regex}\nType: ${n.type}\nIsVar: ${n.is_variable}\nDescription: ${n.description||''}`;
+      nodeSpan.addEventListener('click', ()=>{
+        if(deleteMode){
+          if(selectedForDeletion.has(nodeId)){
+            selectedForDeletion.delete(nodeId);
+            nodeSpan.classList.remove('deleteCandidateText');
+          } else {
+            selectedForDeletion.add(nodeId);
+            nodeSpan.classList.add('deleteCandidateText');
+          }
+        } else if(batchUpdateMode){
+          if(batchSelectedNodes.has(nodeId)){
+            batchSelectedNodes.delete(nodeId);
+            nodeSpan.classList.remove('deleteCandidateText');
+          } else {
+            batchSelectedNodes.add(nodeId);
+            nodeSpan.classList.add('deleteCandidateText');
+          }
+          updateBatchDetailPanel();
+        } else {
+          showTypeEditor(nodeId);
+        }
+      });
+      ul.appendChild(li);
+      li.appendChild(nodeSpan);
+    });
+    listContainer.appendChild(ul);
+    section.appendChild(listContainer);
+
+    toggleBtn.addEventListener('click', ()=>{
+      if(listContainer.style.display === 'none'){
+        listContainer.style.display = 'block';
+        toggleBtn.textContent = '[-]';
+      } else {
+        listContainer.style.display = 'none';
+        toggleBtn.textContent = '[+]';
+      }
+    });
+
+    nameSpan.addEventListener('click', async ()=>{
+      if(batchUpdateMode){
+        grouped[tt].forEach(nodeId => {
+          batchSelectedNodes.add(nodeId);
+        });
+        updateBatchDetailPanel();
+      } else {
+        let newType = prompt(`Reassign all nodes from type '${tt}' to (choose from: ${allTypes.join(', ')})`, tt);
+        if(!newType) return;
+        renameAllNodesForType(tt, newType);
+      }
+    });
+
+    container.appendChild(section);
+  });
+}
+
+function renameAllNodesForType(oldType, newType){
+  let nodeList = [];
+  let nodesData = [];
+  for(let nid in allNodes){
+    let n = allNodes[nid];
+    let t = n.type || '(none)';
+    if(t === oldType){
+      nodeList.push(parseInt(nid,10));
+      nodesData.push({
+        type: newType,
+        description: n.description || ''
+      });
+    }
+  }
+  if(nodeList.length===0){
+    alert(`No nodes with type '${oldType}'.`);
+    return;
+  }
+  apiModifyCall('/api/batch_set_node_semantics',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ node_ids: nodeList, nodes: nodesData })
+  })
+  .then(resp=>{
+    if(!resp.ok) throw new Error('Batch reassign type failed');
+    return resp.json();
+  })
+  .then(()=>{
+    detailContent.innerHTML = `<p style="color:green;">Reassigned type '${oldType}' to '${newType}' on ${nodeList.length} node(s).</p>`;
+    renderTypeList();
+  })
+  .catch(e=>{
+    console.error(e);
+    detailContent.innerHTML = `<p style="color:red;">Error reassigning type: ${escapeHtml(e.toString())}</p>`;
+  });
+}
+
+async function showTypeEditor(nodeId){
+  try{
+    let nodeResp = await apiCall(`/api/get_node/${nodeId}`);
+    if(!nodeResp.ok){
+      detailContent.innerHTML=`<p style="color:red;">Failed to fetch node info for editing type.</p>`;
+      return;
+    }
+    let nodeData = await nodeResp.json();
+    let readOnlyHtml = buildNodeEditorHtml(nodeData,true);
+
+    if(allTypes.length===0) await loadAllTypes();
+
+    let optionHtml = allTypes.map(t => {
+      let sel = (t === nodeData.type)?'selected':'';
+      return `<option value="${escapeHtml(t)}" ${sel}>${escapeHtml(t)}</option>`;
+    }).join('');
+
+    let typeEditorHtml=`
+      <hr/>
+      <h4>Type Editor</h4>
+      <div class="formRow">
+        <label>Type:</label>
+        <select id="typeSelect">
+          ${optionHtml}
+        </select>
+      </div>
+      <div class="formRow">
+        <label>Description:</label>
+        <textarea id="typeDescInput" rows="4" cols="40" readonly>${escapeHtml(nodeData.description||'')}</textarea>
+      </div>
+      <button id="saveTypeSemanticsBtn" style="margin-top:1em; background:#dfd;">Save Type</button>
+      <div id="typeEditorStatus"></div>
+    `;
+    detailContent.innerHTML = readOnlyHtml + typeEditorHtml;
+
+    document.getElementById('saveTypeSemanticsBtn').addEventListener('click', async ()=>{
+      let newTyp = document.getElementById('typeSelect').value.trim();
+      let newDesc= document.getElementById('typeDescInput').value.trim();
+      try{
+        await saveNodeTypeSemantics(nodeId, newTyp, newDesc);
+        document.getElementById('typeEditorStatus').innerHTML = '<p style="color:green;">Saved type semantics.</p>';
+      }catch(e){
+        document.getElementById('typeEditorStatus').innerHTML = `<p style="color:red;">Error: ${escapeHtml(String(e))}</p>`;
+      }
+    });
+  } catch(e){
+    console.error(e);
+    detailContent.innerHTML = `<p style="color:red;">Error showing type editor: ${escapeHtml(e.toString())}</p>`;
+  }
+}
+
+function saveNodeTypeSemantics(nodeId, type, description){
+  return apiModifyCall(`/api/set_node_semantics/${nodeId}`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ type, description })
+  })
+  .then(resp=>{
+    if(!resp.ok) throw new Error('Set node semantics for type failed');
+    return resp.json();
+  })
+  .then(()=>{
+    if(viewMode==='type'){
+      return loadAllNodes().then(()=> doRenderTypeList());
+    }
+  });
+}
+
+/**********************************************************
+ * Event List (template-based)
+ **********************************************************/
+async function renderEventList(){
+  // Load the list of valid events
+  await loadAllEvents();
+
+  // Group templates by event or "unmapped"
+  let grouped = {};
+  allEvents.forEach(ev => grouped[ev] = []);
+  grouped["unmapped"] = [];
+
+  let templateIds = Object.keys(allTemplates).map(x=>parseInt(x,10)).sort((a,b)=>a-b);
+  for(let tId of templateIds){
+    let tObj = allTemplates[tId];
+    let evList = tObj.events || [];
+    if(evList.length===0){
+      grouped["unmapped"].push(tId);
+    } else {
+      for(let ev of evList){
+        if(!grouped[ev]) grouped[ev] = [];
+        grouped[ev].push(tId);
+      }
+    }
+  }
+
+  let container = eventListContainer;
+  container.innerHTML = '<h3>Templates By Event</h3>';
+
+  container.removeEventListener('click', onEventListClick, false);
+  container.addEventListener('click', onEventListClick);
+
+  let eventNames = Object.keys(grouped).sort();
+  eventNames.forEach(evName=>{
+    let tList = grouped[evName];
+    // show "unmapped" even if empty
+    if(evName!=="unmapped" && tList.length===0) return;
+
+    let section = document.createElement('div');
+    section.classList.add('attributeSection');
+    section.dataset.eventName = evName;
+
+    let header = document.createElement('div');
+    header.classList.add('attributeHeader');
+
+    let toggleBtn = document.createElement('span');
+    toggleBtn.textContent = '[+]';
+    toggleBtn.classList.add('attributeToggleBtn');
+
+    let nameSpan = document.createElement('span');
+    nameSpan.textContent = (evName==='unmapped'?' Unmapped ': ' '+evName+' ');
+    nameSpan.classList.add('attributeName');
+    nameSpan.dataset.eventName = evName;
+
+    header.appendChild(toggleBtn);
+    header.appendChild(nameSpan);
+    section.appendChild(header);
+
+    let listContainer = document.createElement('div');
+    listContainer.classList.add('attributeNodes');
+    listContainer.style.display = 'none';
+
+    let ul = document.createElement('ul');
+    tList.forEach(templateId=>{
+      let li = document.createElement('li');
+      li.innerHTML = renderTemplateLine(templateId);
+      ul.appendChild(li);
+    });
+    listContainer.appendChild(ul);
+    section.appendChild(listContainer);
+
+    toggleBtn.addEventListener('click', ()=>{
+      if(listContainer.style.display === 'none'){
+        listContainer.style.display = 'block';
+        toggleBtn.textContent = '[-]';
+      } else {
+        listContainer.style.display = 'none';
+        toggleBtn.textContent = '[+]';
+      }
+    });
+
+    nameSpan.addEventListener('click', ()=>{
+      if(batchUpdateMode){
+        tList.forEach(tid=>{
+          if(batchSelectedTemplates.has(tid)){
+            batchSelectedTemplates.delete(tid);
+          } else {
+            batchSelectedTemplates.add(tid);
+          }
+        });
+        updateBatchDetailPanel();
+      } else {
+        detailContent.innerHTML = `<p>In "event" mode, clicking an event group name without batch mode does nothing special.</p>`;
+      }
+    });
+
+    container.appendChild(section);
+  });
+}
+
+function onEventListClick(e){
+  const targ = e.target;
+  if(targ.classList.contains('templateId')){
+    let tid = parseInt(targ.dataset.templateid,10);
+    if(isNaN(tid)) return;
+    if(batchUpdateMode){
+      if(batchSelectedTemplates.has(tid)){
+        batchSelectedTemplates.delete(tid);
+        targ.classList.remove('deleteCandidateText');
+      } else {
+        batchSelectedTemplates.add(tid);
+        targ.classList.add('deleteCandidateText');
+      }
+      updateBatchDetailPanel();
+    } else {
+      showEventEditor(tid);
+    }
+  }
+  else if(targ.classList.contains('templateNode')){
+    let nid = parseInt(targ.dataset.nodeid,10);
+    if(isNaN(nid)) return;
+    if(batchUpdateMode){
+      detailContent.innerHTML = "<p>In 'event' mode, batch updates only apply to templates (not to nodes).</p>";
+    } else {
+      showNodeEditor(nid);
+    }
+  }
+}
+
+async function loadAllEvents(){
+  let r = await apiCall('/api/get_events');
+  if(!r.ok) throw new Error('Failed to load events');
+  allEvents = await r.json();
+}
+
+function showEventEditor(templateId){
+  let tObj = allTemplates[templateId];
+  if(!tObj){
+    detailContent.innerHTML = `<p style="color:red;">Template #${templateId} not found.</p>`;
+    return;
+  }
+  const {nodes, matched_lines, events} = tObj;
+  buildEventEditorUI(templateId, nodes, matched_lines, events||[]);
+}
+
+function buildEventEditorUI(templateId, templateNodes, matchedLines, templateEvents){
+  const linesHtml = (matchedLines||[]).slice(0,100)
+    .map(l=>`<div>${escapeHtml(l)}</div>`).join('');
+  const nodeListHtml = (templateNodes||[]).map(n=>{
+    const color = n.is_variable?'blue':'goldenrod';
+    const hover = `ID: ${n.id}, Regex: ${n.regex}, WS: ${n.trailing_whitespace}, Var: ${n.is_variable}`;
+    const val   = n.value||'(empty)';
+    return `<span style="color:${color}; margin-right:0.3em;" title="${escapeHtml(hover)}"
+                class="templateNode singleTemplatePreview" data-nodeid="${n.id}">
+              ${escapeHtml(val)}
+            </span>`;
+  }).join('<span style="color:#999;"> | </span>');
+
+  let readOnlyHtml = `
+    <h4>Template #${templateId} (Read-Only)</h4>
+    <b>Nodes in path:</b>
+    <div style="margin-left:1em; margin-bottom:1em;">
+      ${nodeListHtml}
+    </div>
+    <b>Matched lines (up to 100):</b>
+    <div style="max-height:200px; overflow-y:auto; border:1px solid #ccc; margin-bottom:1em;">
+      ${linesHtml}
+    </div>
+  `;
+
+  let options = allEvents.map(ev=>{
+    let sel = templateEvents.includes(ev) ? 'selected' : '';
+    return `<option value="${escapeHtml(ev)}" ${sel}>${escapeHtml(ev)}</option>`;
+  }).join('');
+  let eventsFormHtml = `
+    <div style="margin-top:1em; border:1px solid #ccc; padding:0.5em;">
+      <h4>Set Template Events</h4>
+      <p>Select zero or more events for template #${templateId}:</p>
+      <select id="templateEventsSelect" multiple size="8" style="width:80%;">
+        ${options}
+      </select>
+      <br/>
+      <button id="saveTemplateEventsBtn" style="margin-top:1em; background:#dfd;">Save Events</button>
+      <div id="templateEventsStatus"></div>
+    </div>
+  `;
+
+  detailContent.innerHTML = readOnlyHtml + eventsFormHtml;
+
+  document.getElementById('saveTemplateEventsBtn').addEventListener('click', async ()=>{
+    let selElem = document.getElementById('templateEventsSelect');
+    let chosen = [];
+    for(let opt of selElem.options){
+      if(opt.selected){
+        chosen.push(opt.value);
+      }
+    }
+    try{
+      let r = await apiModifyCall(`/api/set_template_events/${templateId}`, {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(chosen)
+      });
+      if(!r.ok) throw new Error('Saving events failed');
+      document.getElementById('templateEventsStatus').innerHTML = '<p style="color:green;">Events updated!</p>';
+      allTemplates[templateId].events = chosen;
+      renderEventList();
+    } catch(e){
+      document.getElementById('templateEventsStatus').innerHTML = `<p style="color:red;">Error: ${escapeHtml(String(e))}</p>`;
+    }
+  });
+}
+
+/**********************************************************
+ * Mapping Mode 
+ **********************************************************/
+async function renderMappingList(){
+  await loadAllNodes();
+  await loadAllAttributeMappings();
+  doRenderMappingList();
+}
+
+async function loadAllAttributeMappings(){
+  let r = await apiCall('/api/get_all_attribute_mappings');
+  if(!r.ok) throw new Error('Failed to load all attribute mappings');
+  let data = await r.json();
+  allAttributeMappings = data;
+}
+
+function doRenderMappingList(){
+  let container = mappingListContainer;
+  container.innerHTML = '<h3>OCSF Mapping List</h3>';
+
+  // Group node IDs by attribute
+  let grouped = {};
+  for(let nid in allNodes){
+    let n = allNodes[nid];
+    if(!n.attribute_name) continue;
+    let an = n.attribute_name;
+    if(!grouped[an]) grouped[an] = [];
+    grouped[an].push(parseInt(nid,10));
+  }
+
+  let attrNames = Object.keys(allAttributeMappings);
+  for(let an in grouped){
+    if(!attrNames.includes(an)) attrNames.push(an);
+  }
+  attrNames.sort();
+
+  container.removeEventListener('click', onMappingContainerClick, false);
+  container.addEventListener('click', onMappingContainerClick);
+
+  attrNames.forEach(an=>{
+    let section = document.createElement('div');
+    section.classList.add('attributeSection');
+    section.dataset.attrName = an;
+
+    let header = document.createElement('div');
+    header.classList.add('attributeHeader');
+
+    let toggleBtn = document.createElement('span');
+    toggleBtn.textContent = '[+]';
+    toggleBtn.classList.add('attributeToggleBtn');
+
+    let nameSpan = document.createElement('span');
+    nameSpan.textContent = ' ' + an + ' ';
+    nameSpan.classList.add('mappingAttributeName');
+    nameSpan.dataset.attrName = an;
+
+    header.appendChild(toggleBtn);
+    header.appendChild(nameSpan);
+    section.appendChild(header);
+
+    let listContainer = document.createElement('div');
+    listContainer.classList.add('attributeNodes');
+    listContainer.style.display = 'none';
+
+    let nodeList = grouped[an]||[];
+    if(nodeList.length>0){
+      let ul = document.createElement('ul');
+      nodeList.forEach(nodeId=>{
+        let n = allNodes[nodeId];
+        let li = document.createElement('li');
+        let nodeSpan = document.createElement('span');
+        nodeSpan.classList.add('mappingNode');
+        nodeSpan.dataset.nodeid = nodeId;
+        nodeSpan.textContent = `${nodeId}: ${n.value||''}`;
+        nodeSpan.title = `ID: ${nodeId}\nRegex: ${n.regex}\nType: ${n.type}\nIsVar: ${n.is_variable}\nDescription: ${n.description||''}`;
+        ul.appendChild(li);
+        li.appendChild(nodeSpan);
+      });
+      listContainer.appendChild(ul);
+    } else {
+      listContainer.innerHTML = '<p style="color:#999;">No nodes mapped to this attribute yet.</p>';
+    }
+    section.appendChild(listContainer);
+
+    toggleBtn.addEventListener('click', ()=>{
+      if(listContainer.style.display === 'none'){
+        listContainer.style.display = 'block';
+        toggleBtn.textContent = '[-]';
+      } else {
+        listContainer.style.display = 'none';
+        toggleBtn.textContent = '[+]';
+      }
+    });
+
+    container.appendChild(section);
+  });
+}
+
+function onMappingContainerClick(e){
+  const targ = e.target;
+  if(targ.classList.contains('mappingAttributeName')){
+    let an = targ.dataset.attrName;
+    if(an) {
+      showMappingAttributeDetail(an);
+    }
+  }
+  else if(targ.classList.contains('mappingNode')){
+    let nid = parseInt(targ.dataset.nodeid, 10);
+    if(!isNaN(nid)){
+      showNodeEditor(nid);
+    }
+  }
+}
+
+async function showMappingAttributeDetail(attributeName){
+  detailContent.innerHTML = `Loading mapping for attribute '${attributeName}'…`;
+  try{
+    let r = await apiCall(`/api/get_attribute_mapping/${encodeURIComponent(attributeName)}`);
+    if(!r.ok){
+      detailContent.innerHTML = `<p style="color:red;">Failed to fetch attribute mapping.</p>`;
+      return;
+    }
+    let data = await r.json();
+    let { OCSF_mapping=[], description=null, templates=[] } = data;
+
+    let eventsResp = await apiCall(`/api/get_events_per_attribute/${encodeURIComponent(attributeName)}`);
+    let attributeEvents = [];
+    if(eventsResp.ok){
+      attributeEvents = await eventsResp.json();
+    }
+
+    let possibleFields = await getPossibleOCSFFields(attributeName);
+
+    let mappingHtml = '';
+    if(OCSF_mapping.length>0){
+      mappingHtml = OCSF_mapping.map(m =>{
+        let desc = possibleFields[m] || '';
+        return `<div title="${escapeHtml(desc)}">${escapeHtml(m)}</div>`;
+      }).join('');
+    } else {
+      mappingHtml = '<i>(none)</i>';
+    }
+
+    let readOnlyHtml=`
+      <h4>Attribute: ${escapeHtml(attributeName)}</h4>
+      <div class="formRow">
+        <label>Description:</label>
+        <div>${escapeHtml(description||'(none)')}</div>
+      </div>
+      <div class="formRow">
+        <label>Templates (sample):</label>
+        <div>${templates.map(tid=>renderTemplateLine(tid)).join('<br/>')}</div>
+      </div>
+      <div class="formRow">
+        <label>OCSF Mappings:</label>
+        <div class="mappingReadOnlyBox">
+          ${mappingHtml}
+        </div>
+      </div>
+      <div class="formRow">
+        <label>Events Mapped to This Attribute:</label>
+        <div class="mappingReadOnlyBox">
+          ${
+            attributeEvents.length>0
+              ? attributeEvents.map(ev=>`<div>${escapeHtml(ev)}</div>`).join('')
+              : '<i>(none)</i>'
+          }
+        </div>
+      </div>
+      <button id="editAttrMappingBtn" style="margin-top:1em; background:#ffd;">Edit Mapping</button>
+    `;
+    detailContent.innerHTML = readOnlyHtml;
+
+    document.getElementById('editAttrMappingBtn').addEventListener('click', ()=>{
+      handleEditMapping(attributeName, description||'', OCSF_mapping, templates, attributeEvents);
+    });
+  } catch(e){
+    detailContent.innerHTML = `<p style="color:red;">Error retrieving attribute mapping: ${escapeHtml(String(e))}</p>`;
+    console.error(e);
+  }
+}
+
+async function getPossibleOCSFFields(attributeName){
+  let out = {};
+  try{
+    let r = await apiCall(`/api/get_mappings/${encodeURIComponent(attributeName)}`);
+    if(!r.ok) return out;
+    let data = await r.json(); // { exact:{}, fuzzy:{}, all:{} }
+    for(let cat of ['exact','fuzzy','all']){
+      for(let k in data[cat]){
+        if(!out[k]) out[k] = data[cat][k];
+      }
+    }
+  } catch(e){
+    console.warn('getPossibleOCSFFields error', e);
+  }
+  return out;
+}
+
+function handleEditMapping(attributeName, oldDescription, oldMappings, templatesList, attributeEvents){
+  detailContent.innerHTML = `Loading possible mappings for '${attributeName}'…`;
+  getPossibleOCSFFields(attributeName).then(dataDict=>{
+    let allFields = Object.keys(dataDict);
+    let selectedSet = new Set(oldMappings);
+
+    let fieldsArr = allFields.map(f => ({
+      field: f,
+      desc: dataDict[f]||'',
+      isSelected: selectedSet.has(f)
+    }));
+    fieldsArr.sort((a,b)=>{
+      if(a.isSelected && !b.isSelected) return -1;
+      if(b.isSelected && !a.isSelected) return 1;
+      return a.field.localeCompare(b.field);
+    });
+
+    buildMappingEditorUI(attributeName, oldDescription, fieldsArr, selectedSet, templatesList, attributeEvents);
+  }).catch(e=>{
+    detailContent.innerHTML = `<p style="color:red;">Error: ${escapeHtml(String(e))}</p>`;
+    console.error(e);
+  });
+}
+
+function buildMappingEditorUI(attributeName, oldDescription, fieldsArr, selectedSet, templatesList, attributeEvents){
+  let templatesHtml = '';
+  if(Array.isArray(templatesList) && templatesList.length>0){
+    let lines = templatesList.map(tid => window.renderTemplateLine ? window.renderTemplateLine(tid) : `#${tid}`).join('<br/>');
+    templatesHtml = `
+      <div style="margin-top:1em; padding:0.5em; border:1px solid #ccc;">
+        <h4>Templates referencing this attribute</h4>
+        <div>${lines}</div>
+      </div>
+    `;
+  }
+  let formHtml = `
+    <h4>Edit Mapping for '${escapeHtml(attributeName)}'</h4>
+    <div class="formRow">
+      <label>Description:</label>
+      <textarea id="mappingDescInput" rows="3" cols="50">${escapeHtml(oldDescription||'')}</textarea>
+    </div>
+    ${templatesHtml}
+    <div class="formRow">
+      <label>Events Mapped to This Attribute:</label>
+      <div class="mappingReadOnlyBox">
+        ${
+          attributeEvents.length>0
+            ? attributeEvents.map(ev=>`<div>${escapeHtml(ev)}</div>`).join('')
+            : '<i>(none)</i>'
+        }
+      </div>
+    </div>
+    <div style="margin-top:1em;">
+      <label for="mappingSearchInput">Search Fields:</label>
+      <input type="text" id="mappingSearchInput" placeholder="Type to filter..." />
+    </div>
+    <div id="mappingCheckboxContainer" class="mappingEditContainer">
+    </div>
+    <button id="confirmMappingBtn" style="margin-top:1em;background:#dfd;">Confirm</button>
+    <button id="cancelMappingBtn" style="margin-top:1em;margin-left:1em;">Cancel</button>
+    <div id="mappingEditStatus"></div>
+  `;
+  detailContent.innerHTML = formHtml;
+
+  let searchInput = document.getElementById('mappingSearchInput');
+  let container   = document.getElementById('mappingCheckboxContainer');
+
+  function renderCheckboxes(filterText){
+    filterText = (filterText||'').toLowerCase();
+    let html = '';
+    for(let f of fieldsArr){
+      let textMatch = (f.field.toLowerCase().includes(filterText) ||
+        (f.desc||'').toLowerCase().includes(filterText));
+      if(!textMatch && filterText) continue;
+
+      let checkedStr = selectedSet.has(f.field)? 'checked' : '';
+      html += `
+        <div class="mappingCheckboxRow">
+          <input type="checkbox" class="mappingCheckbox" id="chk_${escapeHtml(f.field)}"
+                 value="${escapeHtml(f.field)}" ${checkedStr}/>
+          <label for="chk_${escapeHtml(f.field)}" title="${escapeHtml(f.desc||'')}">
+            ${escapeHtml(f.field)}
+          </label>
+        </div>
+      `;
+    }
+    container.innerHTML = html;
+
+    let allCbs = container.querySelectorAll('.mappingCheckbox');
+    allCbs.forEach(cb=>{
+      cb.addEventListener('change', (evt)=>{
+        if(cb.checked){
+          selectedSet.add(cb.value);
+        } else {
+          selectedSet.delete(cb.value);
+        }
+      });
+    });
+  }
+
+  renderCheckboxes('');
+
+  searchInput.addEventListener('input', ()=>{
+    let q = searchInput.value.trim();
+    renderCheckboxes(q);
+  });
+
+  document.getElementById('confirmMappingBtn').addEventListener('click', async ()=>{
+    let newDesc = document.getElementById('mappingDescInput').value.trim();
+    let finalArr = Array.from(selectedSet);
+
+    try{
+      let setR = await apiModifyCall('/api/set_attribute_mapping/', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          attribute_name: attributeName,
+          OCSF_fields: finalArr,
+          description: newDesc
+        })
+      });
+      if(!setR.ok) throw new Error('Saving attribute mapping failed');
+      detailContent.innerHTML = '<p style="color:green;">Attribute mapping updated successfully.</p>';
+      showMappingAttributeDetail(attributeName);
+    } catch(e){
+      document.getElementById('mappingEditStatus').innerHTML = `<p style="color:red;">Error: ${escapeHtml(String(e))}</p>`;
+    }
+  });
+
+  document.getElementById('cancelMappingBtn').addEventListener('click', ()=>{
+    showMappingAttributeDetail(attributeName);
+  });
+}
+
+/**********************************************************
+ * Batch Update Panel
+ **********************************************************/
+function updateBatchDetailPanel(){
+  if(!batchUpdateMode){
+    detailContent.innerHTML = '<p>Batch update mode is off.</p>';
+    return;
+  }
+
+  if(viewMode==='attribute'){
+    let selectedIds = Array.from(batchSelectedNodes);
+    let listHtml = '<ul>';
+    for(let nid of selectedIds){
+      let nData = allNodes[nid];
+      listHtml += `<li>Node #${nid} (value: ${escapeHtml(nData?.value||'')})</li>`;
+    }
+    listHtml += '</ul>';
+    detailContent.innerHTML = `
+      <h3>Batch Update: Attributes</h3>
+      <p>Selected nodes: ${selectedIds.length}</p>
+      ${listHtml}
+      <div class="formRow">
+        <label>New Attribute Name:</label>
+        <input type="text" id="batchAttrName"/>
+      </div>
+      <div class="formRow">
+        <label>New Description:</label>
+        <textarea id="batchAttrDesc" rows="3" cols="40"></textarea>
+      </div>
+      <button id="applyBatchUpdateBtn" style="margin-top:1em;background:#dfd;">Apply to Selected Nodes</button>
+      <div id="batchUpdateStatus"></div>
+    `;
+    document.getElementById('applyBatchUpdateBtn').addEventListener('click', ()=>{
+      let batchAttrName = document.getElementById('batchAttrName').value.trim();
+      let batchAttrDesc = document.getElementById('batchAttrDesc').value.trim();
+      if(selectedIds.length===0) return;
+      let nodesData = selectedIds.map(()=>({
+        attribute_name: batchAttrName,
+        description: batchAttrDesc
+      }));
+      apiModifyCall('/api/batch_set_node_semantics',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ node_ids: selectedIds, nodes: nodesData })
+      })
+      .then(resp=>{
+        if(!resp.ok) throw new Error('Batch update failed');
+        return resp.json();
+      })
+      .then(()=>{
+        document.getElementById('batchUpdateStatus').innerHTML = '<p style="color:green;">Batch update complete.</p>';
+        batchUpdateMode = false;
+        batchSelectedNodes.clear();
+        loadAllNodes().then(()=> doRenderMappingsList());
+      })
+      .catch(e=>{
+        document.getElementById('batchUpdateStatus').innerHTML = `<p style="color:red;">Error: ${escapeHtml(String(e))}</p>`;
+      });
+    });
+  }
+  else if(viewMode==='type'){
+    let selectedIds = Array.from(batchSelectedNodes);
+    let listHtml = '<ul>';
+    for(let nid of selectedIds){
+      let nData = allNodes[nid];
+      listHtml += `<li>Node #${nid} (value: ${escapeHtml(nData?.value||'')})</li>`;
+    }
+    listHtml += '</ul>';
+
+    let optionsHtml = allTypes.map(t=>`<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
+    detailContent.innerHTML = `
+      <h3>Batch Update: Types</h3>
+      <p>Selected nodes: ${selectedIds.length}</p>
+      ${listHtml}
+      <div class="formRow">
+        <label>New Type:</label>
+        <select id="batchTypeSelect">
+          <option value="">(unchanged)</option>
+          ${optionsHtml}
+        </select>
+      </div>
+      <div class="formRow">
+        <label>New Description:</label>
+        <input type="text" id="batchTypeDesc"/>
+      </div>
+      <button id="applyBatchTypeUpdateBtn" style="margin-top:1em;background:#dfd;">Apply to Selected Nodes</button>
+      <div id="batchUpdateStatus"></div>
+    `;
+    document.getElementById('applyBatchTypeUpdateBtn').addEventListener('click', async ()=>{
+      let newTyp = document.getElementById('batchTypeSelect').value.trim();
+      let newDesc= document.getElementById('batchTypeDesc').value.trim();
+      if(!selectedIds.length){
+        document.getElementById('batchUpdateStatus').innerHTML = '<p style="color:red;">No selected nodes.</p>';
+        return;
+      }
+      let nodesData = selectedIds.map(()=>({ type:newTyp, description:newDesc }));
+      try{
+        let r = await apiModifyCall('/api/batch_set_node_semantics',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ node_ids: selectedIds, nodes: nodesData })
+        });
+        if(!r.ok){
+          throw new Error('Batch type update failed');
+        }
+        await r.json();
+        document.getElementById('batchUpdateStatus').innerHTML = '<p style="color:green;">Batch type update complete.</p>';
+        batchUpdateMode=false;
+        batchSelectedNodes.clear();
+        loadAllNodes().then(()=> doRenderTypeList());
+      } catch(e){
+        document.getElementById('batchUpdateStatus').innerHTML = `<p style="color:red;">Error: ${escapeHtml(String(e))}</p>`;
+      }
+    });
+  }
+  else if(viewMode==='event'){
+    let selectedTids = Array.from(batchSelectedTemplates);
+    let listHtml = '<ul>';
+    for(let tId of selectedTids){
+      listHtml += `<li>Template #${tId}</li>`;
+    }
+    listHtml += '</ul>';
+
+    let options = allEvents.map(ev=>`<option value="${escapeHtml(ev)}">${escapeHtml(ev)}</option>`).join('');
+    detailContent.innerHTML = `
+      <h3>Batch Update: Events</h3>
+      <p>Selected templates: ${selectedTids.length}</p>
+      ${listHtml}
+      <div class="formRow">
+        <label>New Events (multiselect):</label>
+        <select id="batchEventsSelect" multiple size="8" style="width:80%;">
+          ${options}
+        </select>
+      </div>
+      <button id="applyBatchEventsUpdateBtn" style="margin-top:1em; background:#dfd;">Apply to Selected Templates</button>
+      <div id="batchUpdateStatus"></div>
+    `;
+    document.getElementById('applyBatchEventsUpdateBtn').addEventListener('click', async ()=>{
+      let selElem = document.getElementById('batchEventsSelect');
+      let chosen = [];
+      for(let opt of selElem.options){
+        if(opt.selected){
+          chosen.push(opt.value);
+        }
+      }
+      let updateObj = {};
+      for(let tId of selectedTids){
+        updateObj[tId] = chosen;
+      }
+      try{
+        let r = await apiModifyCall('/api/batch_set_template_events',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify(updateObj)
+        });
+        if(!r.ok) throw new Error('Batch set template events failed');
+        await r.json();
+        document.getElementById('batchUpdateStatus').innerHTML = '<p style="color:green;">Batch events update complete.</p>';
+        batchUpdateMode=false;
+        batchSelectedTemplates.clear();
+        let atResp = await apiCall('/api/get_all_templates');
+        if(atResp.ok){
+          let data = await atResp.json();
+          allTemplates = data.templates || {};
+        }
+        renderEventList();
+      } catch(e){
+        document.getElementById('batchUpdateStatus').innerHTML = `<p style="color:red;">Error: ${escapeHtml(String(e))}</p>`;
+      }
+    });
+  }
+  else {
+    detailContent.innerHTML = `
+      <h3>Batch Update in "${viewMode}" view is not implemented here.</h3>
+    `;
+  }
+}
+
+/**********************************************************
+ * Graph Navigation
+ **********************************************************/
+function centerGraphOnNode(nodeId){
+  setViewMode('graph');
+  requestAnimationFrame(()=>{
+    let info = nodeElementsById[nodeId];
+    if(!info){
+      alert('Node not found in graph (possibly removed).');
+      return;
+    }
+    let leftPanel = document.getElementById('leftPanel');
+    const cx=info.finalX;
+    const cy=info.finalY;
+    leftPanel.scrollLeft = cx - leftPanel.clientWidth/2;
+    leftPanel.scrollTop  = cy - leftPanel.clientHeight/2;
+  });
+}
+
+/**********************************************************
+ * NEW: Query mode
+ * We add a "Save Query" feature, plus add "static" matching in each condition.
+ **********************************************************/
+
+function renderQueryUI(){
+  // ensure we match the root query operator in the UI
+  let opSel = document.getElementById('queryOperatorSel');
+  if(opSel){
+    opSel.value = rootQuery.operator;
+    opSel.onchange = ()=>{
+      rootQuery.operator = opSel.value;
+    };
+  }
+  // Render the conditions
+  let editorContainer = document.getElementById('queryEditorContainer');
+  editorContainer.innerHTML = '';
+  renderSubQuery(rootQuery, editorContainer);
+
+  // Add Condition button
+  let addBtn = document.getElementById('addQueryConditionBtn');
+  if(addBtn){
+    addBtn.onclick = ()=>{
+      rootQuery.conditions.push({
+        isSubQuery: false,
+        attrName: '',
+        attrValue: '',
+        exact: true,
+        caseSens: true,
+        comp: null,
+        neg: false,
+        existence: false,
+        static: false  // new property
+      });
+      renderQueryUI();
+    };
+  }
+
+  // Add Sub-Query button
+  let addSubBtn = document.getElementById('addSubQueryBtn');
+  if(addSubBtn){
+    addSubBtn.onclick = ()=>{
+      rootQuery.conditions.push({
+        isSubQuery: true,
+        subQuery: {
+          operator: 'AND',
+          conditions: []
+        }
+      });
+      renderQueryUI();
+    };
+  }
+
+  // Run Query button
+  let runBtn = document.getElementById('runQueryBtn');
+  if(runBtn){
+    runBtn.onclick = ()=> runQuery();
+  }
+
+  // Save Query button
+  let saveQBtn = document.getElementById('saveQueryBtn');
+  if(saveQBtn){
+    saveQBtn.onclick = ()=> saveCurrentQuery();
+  }
+
+  // "Save Results" is for saving matched lines
+}
+
+function renderSubQuery(qObj, containerElem){
+  qObj.conditions.forEach((cond, idx)=>{
+    if(cond.isSubQuery){
+      let subDiv = document.createElement('div');
+      subDiv.style.border = '1px dotted #999';
+      subDiv.style.margin = '0.5em';
+      subDiv.style.padding = '0.5em';
+
+      let subOpLabel = document.createElement('label');
+      subOpLabel.textContent = 'Sub-Query Operator: ';
+      let subOpSel = document.createElement('select');
+      subOpSel.innerHTML = `<option value="AND">AND</option><option value="OR">OR</option>`;
+      subOpSel.value = cond.subQuery.operator || 'AND';
+      subOpSel.onchange = ()=>{
+        cond.subQuery.operator = subOpSel.value;
+      };
+
+      let removeBtn = document.createElement('button');
+      removeBtn.textContent = 'Remove Sub-Query';
+      removeBtn.style.background = '#fcc';
+      removeBtn.onclick = ()=>{
+        qObj.conditions.splice(idx, 1);
+        renderQueryUI();
+      };
+
+      subDiv.appendChild(subOpLabel);
+      subDiv.appendChild(subOpSel);
+      subDiv.appendChild(removeBtn);
+
+      let nestedDiv = document.createElement('div');
+      nestedDiv.style.marginLeft='1em';
+      subDiv.appendChild(nestedDiv);
+
+      let addCondButton = document.createElement('button');
+      addCondButton.textContent = 'Add Condition';
+      addCondButton.style.background = '#eef';
+      addCondButton.style.marginRight = '0.5em';
+      addCondButton.onclick = ()=>{
+        cond.subQuery.conditions.push({
+          isSubQuery: false,
+          attrName: '',
+          attrValue: '',
+          exact: true,
+          caseSens: true,
+          comp: null,
+          neg: false,
+          existence: false,
+          static: false // new property for sub-conditions
+        });
+        renderQueryUI();
+      };
+
+      let addSubQueryButton = document.createElement('button');
+      addSubQueryButton.textContent = 'Add Sub-Query';
+      addSubQueryButton.style.background='#ffd';
+      addSubQueryButton.onclick=()=>{
+        cond.subQuery.conditions.push({
+          isSubQuery: true,
+          subQuery: {
+            operator:'AND',
+            conditions:[]
+          }
+        });
+        renderQueryUI();
+      };
+
+      let subBtnContainer = document.createElement('div');
+      subBtnContainer.style.margin='0.5em 0';
+      subBtnContainer.appendChild(addCondButton);
+      subBtnContainer.appendChild(addSubQueryButton);
+      subDiv.appendChild(subBtnContainer);
+
+      renderSubQuery(cond.subQuery, nestedDiv);
+      containerElem.appendChild(subDiv);
+
+    } else {
+      let row = document.createElement('div');
+      row.style.border = '1px solid #ccc';
+      row.style.padding = '0.5em';
+      row.style.margin = '0.5em 0';
+      row.innerHTML = `
+        <div style="display:flex; flex-wrap: wrap; gap:1em;">
+          <div>
+            <label>Field:</label>
+            <input type="text" class="qcAttrName" value="${escapeHtml(cond.attrName)}" ${cond.static?'disabled':''}/>
+          </div>
+          <div>
+            <label>Value:</label>
+            <input type="text" class="qcAttrValue" value="${escapeHtml(cond.attrValue)}" ${cond.existence?'disabled':''}/>
+          </div>
+          <div style="margin-top:0.5em;">
+            <label>Exact?</label>
+            <input type="checkbox" class="qcExact" ${cond.exact?'checked':''} ${cond.existence?'disabled':''}/>
+          </div>
+          <div style="margin-top:0.5em;">
+            <label>Case-Sens?</label>
+            <input type="checkbox" class="qcCaseSens" ${cond.caseSens?'checked':''} ${cond.existence?'disabled':''}/>
+          </div>
+          <div>
+            <label>Comparison:</label>
+            <select class="qcComparison" ${cond.existence?'disabled':''}>
+              <option value="" ${cond.comp==null?'selected':''}>(none)</option>
+              <option value=">" ${cond.comp==='>'?'selected':''}>&gt;</option>
+              <option value="<" ${cond.comp==='<'?'selected':''}>&lt;</option>
+              <option value="=" ${cond.comp==='='?'selected':''}>=</option>
+              <option value=">=" ${cond.comp==='>='?'selected':''}>&gt;=</option>
+              <option value="<=" ${cond.comp==='<='?'selected':''}>&lt;=</option>
+            </select>
+          </div>
+          <div style="margin-top:0.5em;">
+            <label>Negate?</label>
+            <input type="checkbox" class="qcNegation" ${cond.neg?'checked':''}/>
+          </div>
+          <div style="margin-top:0.5em;">
+            <label>Existence?</label>
+            <input type="checkbox" class="qcExistence" ${cond.existence?'checked':''}/>
+          </div>
+          <div style="margin-top:0.5em;">
+            <label>Static?</label>
+            <input type="checkbox" class="qcStatic" ${cond.static?'checked':''}/>
+          </div>
+          <button class="qcRemoveBtn" style="background:#fcc;">Remove</button>
+        </div>
+      `;
+
+      let removeBtn = row.querySelector('.qcRemoveBtn');
+      removeBtn.onclick = ()=>{
+        qObj.conditions.splice(idx,1);
+        renderQueryUI();
+      };
+
+      let attrNameInput = row.querySelector('.qcAttrName');
+      let attrValueInput= row.querySelector('.qcAttrValue');
+      let exactCb       = row.querySelector('.qcExact');
+      let caseCb        = row.querySelector('.qcCaseSens');
+      let compSelect    = row.querySelector('.qcComparison');
+      let negCb         = row.querySelector('.qcNegation');
+      let existCb       = row.querySelector('.qcExistence');
+      let staticCb      = row.querySelector('.qcStatic');
+
+      attrNameInput.oninput = ()=> cond.attrName = attrNameInput.value;
+      attrValueInput.oninput= ()=> cond.attrValue= attrValueInput.value;
+      exactCb.onchange      = ()=> cond.exact     = exactCb.checked;
+      caseCb.onchange       = ()=> cond.caseSens  = caseCb.checked;
+      compSelect.onchange   = ()=> cond.comp      = compSelect.value || null;
+      negCb.onchange        = ()=> cond.neg       = negCb.checked;
+      existCb.onchange      = ()=>{
+        cond.existence = existCb.checked;
+        renderQueryUI();
+      };
+      staticCb.onchange     = ()=>{
+        cond.static = staticCb.checked;
+        attrNameInput.disabled = cond.static;
+      };
+
+      // On initial render
+      attrNameInput.disabled = cond.static;
+
+      containerElem.appendChild(row);
+    }
+  });
+}
+
+function buildFinalQuery(qObj){
+  let result = {
+    operator: qObj.operator,
+    conditions: []
+  };
+  for(let cond of qObj.conditions){
+    if(cond.isSubQuery){
+      let subQ = buildFinalQuery(cond.subQuery);
+      result.conditions.push(subQ);
+    } else {
+      let attrNames = cond.attrName.includes(',') ? cond.attrName.split(',').map(x=>x.trim()) : cond.attrName;
+      let attrValues= cond.attrValue.includes(',')? cond.attrValue.split(',').map(x=>x.trim()) : cond.attrValue;
+      result.conditions.push([
+        attrNames,
+        attrValues,
+        !!cond.exact,
+        !!cond.caseSens,
+        cond.comp || null,
+        !!cond.neg,
+        !!cond.existence,
+        !!cond.static // new argument
+      ]);
+    }
+  }
+  return result;
+}
+
+async function runQuery(){
+  const finalQuery = buildFinalQuery(rootQuery);
+  try{
+    let resp = await apiCall('/api/run_query/', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ query: finalQuery })
+    });
+    if(!resp.ok){
+      document.getElementById('queryResultsContainer').innerHTML = `<p style="color:red;">Error from server.</p>`;
+      return;
+    }
+    let data = await resp.json(); // array of [ line_id, line_string ]
+    queryResults = data || [];
+    let resultsHtml = '';
+    let totalCount = data.length;
+    let sliceCount = Math.min(100, totalCount);
+    resultsHtml += `<p>Found ${totalCount} matching lines. Showing up to ${sliceCount} below.</p>`;
+    for(let i=0;i<sliceCount;i++){
+      let [lid, line] = data[i];
+      resultsHtml += `<div><strong>${lid}</strong>: ${escapeHtml(line)}</div>`;
+    }
+    document.getElementById('queryResultsContainer').innerHTML = resultsHtml;
+    if(totalCount>0){
+      document.getElementById('saveQueryResultsBtn').style.display = 'inline-block';
+    } else {
+      document.getElementById('saveQueryResultsBtn').style.display = 'none';
+    }
+  } catch(e){
+    console.error(e);
+    document.getElementById('queryResultsContainer').innerHTML = `<p style="color:red;">Error: ${escapeHtml(String(e))}</p>`;
+  }
+}
+
+function saveQueryResults(){
+  if(queryResults.length===0) return;
+  let blob = new Blob([ JSON.stringify(queryResults,null,2) ], {type:'application/json'});
+  let url = URL.createObjectURL(blob);
+  let a = document.createElement('a');
+  a.href = url;
+  a.download = 'query_results.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+/* Save the current query definition to the backend */
+async function saveCurrentQuery(){
+  let queryName = (document.getElementById('queryNameInput')||{}).value || '';
+  queryName = queryName.trim();
+  if(!queryName){
+    alert('Please provide a name for the query.');
+    return;
+  }
+  let finalQuery = buildFinalQuery(rootQuery);
+
+  try{
+    let resp = await apiCall('/api/save_query/', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ query_name: queryName, query: finalQuery })
+    });
+    if(!resp.ok){
+      alert('Error saving query. Please check server logs.');
+      return;
+    }
+    let data = await resp.json();
+    if(data.status==='ok'){
+      alert('Query saved successfully!');
+    } else {
+      alert('Error saving query: ' + JSON.stringify(data));
+    }
+  } catch(e){
+    console.error(e);
+    alert('Error saving query: '+ e);
+  }
+}
+
+/* Right pane: load fields from /api/get_all_field_names */
+async function loadQueryFields(){
+  try{
+    let resp = await apiCall('/api/get_all_field_names');
+    if(!resp.ok){
+      queryFieldListInner.innerHTML = `<p style="color:red;">Cannot load fields.</p>`;
+      return;
+    }
+    let data = await resp.json();
+    if(!data || typeof data !== 'object'){
+      queryFieldListInner.innerHTML = `<p style="color:red;">Unexpected field list format.</p>`;
+      return;
+    }
+    queryFields = data;
+    renderQueryFieldsList();
+  } catch(e){
+    console.error(e);
+    queryFieldListInner.innerHTML = `<p style="color:red;">Error fetching field names: ${escapeHtml(String(e))}</p>`;
+  }
+}
+
+function renderQueryFieldsList(){
+  let searchInput = document.getElementById('queryFieldSearch');
+  let container   = document.getElementById('queryFieldListInner');
+  if(!searchInput || !container) return;
+  searchInput.value = '';
+  function doRender(filterText){
+    container.innerHTML = '';
+    let keys = Object.keys(queryFields).sort();
+    if(filterText){
+      filterText = filterText.toLowerCase();
+      keys = keys.filter(k => k.toLowerCase().includes(filterText) || (queryFields[k]||'').toLowerCase().includes(filterText));
+    }
+    keys.forEach(fieldName=>{
+      let desc = queryFields[fieldName] || '';
+      let div = document.createElement('div');
+      div.style.cursor = 'pointer';
+      div.title = desc;
+      div.textContent = fieldName;
+      div.addEventListener('click', ()=>{
+        navigator.clipboard.writeText(fieldName).catch(()=>{});
+        alert(`Field name "${fieldName}" copied to clipboard. Paste into a condition if desired.`);
+      });
+      container.appendChild(div);
+    });
+  }
+  doRender('');
+
+  searchInput.oninput = ()=>{
+    doRender(searchInput.value.trim());
+  };
+}
+
+/* Initial load */
+loadTree();
+</script>
+</body>
+</html>

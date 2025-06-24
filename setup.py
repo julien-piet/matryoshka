@@ -1,7 +1,27 @@
+import os
+
 from setuptools import find_packages, setup
 
+
+# Read requirements from requirements.txt
+def read_requirements():
+    requirements_path = os.path.join(
+        os.path.dirname(__file__), "requirements.txt"
+    )
+    if os.path.exists(requirements_path):
+        with open(requirements_path, "r", encoding="utf-8") as f:
+            requirements = []
+            for line in f:
+                line = line.strip()
+                # Skip empty lines and comments
+                if line and not line.startswith("#"):
+                    requirements.append(line)
+            return requirements
+    return []
+
+
 setup(
-    name="logparser",
+    name="matryoshka",
     version="0.1",
     description="LLM-based log parser",
     packages=find_packages("src", exclude=["tests*"]),
@@ -13,23 +33,19 @@ setup(
     python_requires="~=3.9",
     include_package_data=True,
     package_dir={"": "src"},
+    install_requires=read_requirements(),
     entry_points={
         "console_scripts": [
-            "logparser-parse=logparser.run_parsing:main",
-            "logparser-type=logparser.run_typing:main",
-            "logparser-event=logparser.run_event_matching:main",
-            "logparser-map=logparser.run_mapping:main",
-            "logparser-create=logparser.run_creation:main",
-            "logparser-norm=logparser.run_norm:main",
-            "logparser-fill=logparser.run_fill:main",
-            "logparser-ocsf-parse=logparser.run_ocsf_type_parsing:main",
-            "logparser-convert=logparser.convert:main",
-            "logparser-viz=logparser.curation.app:main",
-            "logparser-run-loghub=logparser.evaluation.parse_loghub:main",
-            "logparser-compare=logparser.evaluation.compute_metrics:main",
-            "logparser-ingest=logparser.evaluation.ingest_relwork:main",
-            "logparser-reparse=logparser.run_parse:main",
-            "logparser-eval=logparser.evaluation.full_eval:main",
+            "matryoshka-syntax=matryoshka.entrypoints.syntax:main",
+            "matryoshka-schema=matryoshka.entrypoints.schema:main",
+            "matryoshka-map=matryoshka.entrypoints.map:main",
+            "matryoshka=matryoshka.entrypoints.all:main",
+            "matryoshka-edit=matryoshka.curation.app:main",
+            "matryoshka-eval=matryoshka.evaluation.eval_full:main",
+            "matryoshka-ingest-loghub-baseline=matryoshka.evaluation.compare_to_loghub:main",
+            "matryoshka-ingest-loghub-relwork=matryoshka.evaluation.ingest_relworks:main",
+            "matryoshka-eval-syntax=matryoshka.evaluation.eval_syntax:main",
+            "matryoshka-ingest=matryoshka.entrypoints.ingest:main",
         ]
     },
     zip_safe=False,
