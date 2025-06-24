@@ -221,7 +221,7 @@ Matryoshka was evaluated on both [LogHub 2.0](https://github.com/logpai/loghub-2
 
 OCSF attributes are only described in the context of their parent attribute. Matryoshka augments OCSF attributes with a description relative to the event they are part of. For instance, field `authentication.src_endpoint.ip` is described as "The IP address of the endpoint, in either IPv4 or IPv6 format.", while our generated description for this field is "The IP address (IPv4 or IPv6) of the source endpoint involved in the authentication event (e.g., a user's login or logout attempt).", taking into account the role of its parent.
 
-Generating these descriptions is costly, but only needs to be done once every time OCSF releases a new version. These descriptions are saved in a cache directory. When running the mapping algorithm, this cache will be created automatically. To avoid doing this yourself, you can download cached descriptions **[📥 here](#)**, extract them, and put the `OCSF` directory at the `.cache/OCSF` path.
+Generating these descriptions is costly, but only needs to be done once every time OCSF releases a new version. These descriptions are saved in a cache directory. When running the mapping algorithm, this cache will be created automatically. To avoid doing this yourself, you can download cached descriptions **[📥 here](https://drive.google.com/file/d/19nLz10RCMXLeK6fC9jSgJkcp-F3BbTqG/view?usp=share_link)**, extract them, and put both json files in an `OCSF` directory at the `.cache/OCSF` path.
 
 
 
