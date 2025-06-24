@@ -139,7 +139,7 @@ Create a JSON configuration file:
 ```
 
 **Configuration Fields:**
-- `data_path`: **Required** - Path to your log file. An example sshd log file is provided in `examples/sshd.log`. 
+- `data_path`: **Required** - Path to your log file. An example sshd log file is provided in `examples/sshd.txt`. 
 - `example_path`: *Optional* - Example templates (Matryoshka runs zero-shot by default). If you did want to use example templates, they are long to write, because they require writing templates by hand in json, as well as providing a description of the different parts of the template. This could be made simpler by having a language model fill in the gaps. You can find an example in `examples/template.json`.
 - `results_path`: **Required** - Output directory.
 - `description_path`: *Optional* - Text description of log context. This is optional if you want to provide the LLM with more context about the log. You can find an example description file in `examples/descrpition.txt`.
