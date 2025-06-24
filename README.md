@@ -235,8 +235,5 @@ This project is licensed under the [GNU General Public License v3.0](LICENSE.txt
 
 ## Contributing & Contact
 
-For questions, issues, or collaboration opportunities, please contact:
-
-**Julien Piet**  
-📧 [julien.piet@berkeley.edu](mailto:julien.piet@berkeley.edu)  
+For questions, issues, or collaboration opportunities, please contact **Julien Piet** 
 🌐 [Personal Website](https://people.eecs.berkeley.edu/~julien.piet/)
