@@ -67,7 +67,7 @@ def main():
         if not args.output:
             os.makedirs(config["results_path"], exist_ok=True)
             args.output = os.path.join(
-                config["results_path"], f"results_{args.stage}.tsv"
+                config["results_path"], "baseline.json"
             )
     setup_logger()
 

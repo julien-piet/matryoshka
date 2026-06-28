@@ -50,6 +50,17 @@ def main():
         default=1,
     )
     parser.add_argument(
+        "--few-shot-len",
+        type=int,
+        default=3,
+    )
+    parser.add_argument(
+        "--description",
+        type=str,
+        help="Description of the log file (pointer to file containing the description)",
+        default=None,
+    )
+    parser.add_argument(
         "--buffer_size",
         type=int,
         help="Buffer size for processing",
@@ -96,6 +107,12 @@ def main():
         type=str,
         help="Path to cache directory",
         default=".cache/",
+    )
+    parser.add_argument(
+        "--save_contents",
+        action="store_true",
+        help="Save the parsed lines with the parser",
+        default=False,
     )
     # Parse the arguments
     args = parser.parse_args()

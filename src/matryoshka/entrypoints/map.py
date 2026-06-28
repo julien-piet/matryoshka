@@ -465,6 +465,12 @@ def main():
         default=False,
     )
     parser.add_argument(
+        "--ablation_self_correction",
+        action="store_true",
+        help="Ablation: disable self-correction",
+        default=False,
+    )
+    parser.add_argument(
         "--strawman",
         action="store_true",
         help="Use the strawman mapping approach",

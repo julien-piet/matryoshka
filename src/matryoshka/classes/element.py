@@ -244,3 +244,23 @@ class Element:
 
     def __str__(self):
         return f"{self.entity.to_str()}({self.value})"
+
+    @classmethod
+    def from_dict(cls, json_elt: dict) -> "Element":
+        """Load an element from a JSON dictionary."""
+        entity_type = (
+            ElementType.VARIABLE
+            if json_elt.get("is_variable", False)
+            else ElementType.CONSTANT
+        )
+
+        return cls(
+            entity=entity_type,
+            type=json_elt.get("type", None),
+            value=json_elt.get("value"),
+            regexp=json_elt.get("regex", ".*?"),
+            placeholder=json_elt.get("placeholder", None),
+            trailing_whitespace=json_elt.get("trailing_whitespace", 0),
+            id=json_elt.get("id", "-1"),
+            fixed=json_elt.get("fixed", False),
+        )

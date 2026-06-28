@@ -143,7 +143,7 @@ class VariableSemantics:
             "field_description": self.field_description,
             "cluster_description": self.cluster_description,
             "orig_node": self.orig_node,
-            "mapping": self.mapping.to_dict(),
+            "mapping": self.mapping.to_dict() if self.mapping else {},
             "created_attribute": self.created_attribute,
             "embedding": (
                 self.embedding.tolist() if self.embedding is not None else None

@@ -55,11 +55,22 @@ class Tree:
         self.__dict__.update(state)
         self.parent = None
 
-    def get_element(self, node_to_element: list, element: Element):
-        branch_elements = {node_to_element[i]: i for i in self.branches}
-        if element in branch_elements:
-            return branch_elements[element]
+    def get_element(
+        self, node_to_element: list, element: Element, strict=False
+    ):
+        if not strict:
+            branch_elements = {node_to_element[i]: i for i in self.branches}
+            if element in branch_elements:
+                return branch_elements[element]
+            else:
+                return None
         else:
+            for node_id in self.branches:
+                if (
+                    node_to_element[node_id] == element
+                    and element.id == node_id
+                ):
+                    return node_id
             return None
 
     def get_lineage(self):
@@ -140,7 +151,9 @@ class TemplateTree:
             for branch in tree.branches.values():
                 branch.parent = tree
 
-    def add_template(self, elements, example=None, fixed=False, debug=False):
+    def add_template(
+        self, elements, example=None, fixed=False, debug=False, strict=False
+    ):
         if isinstance(elements, Template):
             elements = elements.elements
 
@@ -148,10 +161,23 @@ class TemplateTree:
 
         current_node = self.tree
         for element_id, element in enumerate(elements):
-            next_node_id = current_node.get_element(self.nodes, element)
+            next_node_id = current_node.get_element(
+                self.nodes, element, strict=strict
+            )
             if next_node_id is None:
                 added_new_node = True
-                next_node_id = len(self.nodes)
+                try:
+                    existing_element_id = int(element.id)
+                except ValueError:
+                    existing_element_id = -1
+                if (
+                    existing_element_id < len(self.nodes)
+                    and existing_element_id >= 0
+                    and self.nodes[existing_element_id]
+                ):
+                    next_node_id = existing_element_id
+                else:
+                    next_node_id = len(self.nodes)
                 current_node[next_node_id] = Tree(
                     next_node_id, parent=current_node, terminal=False
                 )
@@ -163,9 +189,12 @@ class TemplateTree:
                 element.compiled_prefix_regex = None
                 element.compiled_prefix_regex_terminal = None
 
-                self.nodes.append(element)
-                self.templates_per_node[next_node_id] = set()
-                self.node_to_tree[next_node_id] = current_node[next_node_id]
+                if element.id == len(self.nodes):
+                    self.nodes.append(element)
+                if element.id not in self.templates_per_node:
+                    self.templates_per_node[element.id] = set()
+                if element.id not in self.node_to_tree:
+                    self.node_to_tree[element.id] = current_node[next_node_id]
             else:
                 self.nodes[next_node_id].fixed = (
                     self.nodes[next_node_id].fixed or fixed
@@ -891,7 +920,16 @@ class TemplateTree:
     @staticmethod
     def load_from_json(json_tree: List[dict]) -> "TemplateTree":
         tree = TemplateTree()
-        for template in json_tree:
+
+        all_elements = {
+            int(elt["id"]): elt for template in json_tree for elt in template
+        }
+        max_id = 1 + max(all_elements.keys()) if all_elements else 1
+        tree.nodes = [None] * max_id
+        for node_id, node in all_elements.items():
+            tree.nodes[node_id] = Element.from_dict(node)
+
+        for t_id, template in enumerate(json_tree):
             template_obj = Template.load_from_json(template)
-            tree.add_template(template_obj)
+            tree.add_template(template_obj, strict=True)
         return tree

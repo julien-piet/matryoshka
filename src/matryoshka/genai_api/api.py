@@ -11,11 +11,12 @@ from .anthropic import anthropic_chat_server
 from .classes import LLMTask, ModelResponses
 from .globals import global_call_queue, global_process_list, global_stop_event
 from .google import gemini_chat_server
+from .google_ai_studio import google_ai_studio_chat_server
 from .openai import openai_chat_server
 
 
 def backend_choices():
-    return ["google", "openai", "anthropic"]
+    return ["google", "google-ai-studio", "openai", "anthropic"]
 
 
 def get_backend(backend_name):
@@ -30,6 +31,8 @@ def get_backend(backend_name):
     """
     if backend_name == "google":
         return gemini_chat_server
+    elif backend_name == "google-ai-studio":
+        return google_ai_studio_chat_server
     elif backend_name == "openai":
         return openai_chat_server
     elif backend_name == "anthropic":

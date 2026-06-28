@@ -49,6 +49,8 @@ setup(
             "matryoshka-validate-syntax=matryoshka.entrypoints.validate_syntax:main",
             "matryoshka-save-baseline=matryoshka.evaluation.save_baseline_as_json:main",
             "matryoshka-convert-lilac=matryoshka.evaluation.convert_lilac_to_tree:main",
+            "matryoshka-naive-llm=matryoshka.entrypoints.naive_llm_parser:main",
+            "matryoshka-eval-adversarial=matryoshka.entrypoints.evals_adversarial:main",
         ]
     },
     zip_safe=False,

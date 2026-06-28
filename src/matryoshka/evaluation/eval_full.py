@@ -7,6 +7,11 @@ import re
 import dill
 
 from ..genai_api.api import Caller, backend_choices, get_backend
+from ..naive_llm_parser.eval_queries import (
+    _load_entries,
+    _load_queries,
+    _run_query,
+)
 from ..utils.logging import setup_logger
 from ..utils.OCSF import OCSFSchemaClient
 from ..utils.structured_log import TreeEditor
@@ -56,11 +61,135 @@ def compare_results(baseline_lines, raw_results_path):
         return 0, 0, {}
 
 
+def _normalize_entry_line(entry):
+    raw_line = (
+        entry.get("content", "")
+        or entry.get("raw", "")
+        or entry.get("message", "")
+    )
+    return re.sub(r"\s+", " ", raw_line.strip()).strip()
+
+
+def _lines_for_ids(entries, line_ids):
+    return [
+        _normalize_entry_line(entries[line_id])
+        for line_id in sorted(line_ids)
+        if _normalize_entry_line(entries[line_id])
+    ]
+
+
+def _score_json_query_results(
+    results_baseline,
+    results_target,
+    baseline_entries,
+    target_entries,
+    *,
+    ocsf=False,
+):
+    results_per_query = {}
+    query_names = sorted(results_baseline.keys())
+    for query in query_names:
+        target_query = f"{query}_ocsf" if ocsf else query
+        if target_query not in results_target:
+            continue
+
+        baseline_lines = set(results_baseline[query])
+        target_lines = set(results_target[target_query])
+        precision = (
+            len(baseline_lines.intersection(target_lines)) / len(target_lines)
+            if target_lines
+            else 0
+        )
+        recall = (
+            len(baseline_lines.intersection(target_lines)) / len(baseline_lines)
+            if baseline_lines
+            else 0
+        )
+        results_per_query[query] = (precision, recall)
+        print(
+            f"Query: {query}, Precision: {precision:.4f}, Recall: {recall:.4f}"
+        )
+
+    if not results_per_query:
+        return 0, 0, {}, {}
+
+    avg_precision = sum(p for p, _ in results_per_query.values()) / len(
+        results_per_query
+    )
+    avg_recall = sum(r for _, r in results_per_query.values()) / len(
+        results_per_query
+    )
+    baseline_lines = {
+        key: _lines_for_ids(baseline_entries, value)
+        for key, value in results_baseline.items()
+    }
+    target_lines = {
+        key: _lines_for_ids(target_entries, value)
+        for key, value in results_target.items()
+    }
+    return avg_precision, avg_recall, baseline_lines, target_lines
+
+
+def evaluate_json_logs_end_to_end(
+    baseline_log_path,
+    target_log_path,
+    baseline_query_path,
+    target_query_paths,
+    save_to_file=None,
+):
+    baseline_entries = _load_entries(baseline_log_path)
+    target_entries = _load_entries(target_log_path)
+
+    baseline_queries = _load_queries(baseline_query_path)
+    target_queries = {}
+    for query_path in target_query_paths:
+        target_queries.update(_load_queries(query_path))
+
+    results_baseline = {
+        query_name: sorted(_run_query(baseline_entries, query_def))
+        for query_name, query_def in baseline_queries.items()
+    }
+    results_target = {
+        query_name: sorted(_run_query(target_entries, query_def))
+        for query_name, query_def in target_queries.items()
+    }
+
+    precision, recall, baseline_lines, target_lines = _score_json_query_results(
+        results_baseline,
+        results_target,
+        baseline_entries,
+        target_entries,
+        ocsf=False,
+    )
+    precision_ocsf, recall_ocsf, _, _ = _score_json_query_results(
+        results_baseline,
+        results_target,
+        baseline_entries,
+        target_entries,
+        ocsf=True,
+    )
+
+    if save_to_file:
+        with open(save_to_file, "w", encoding="utf-8") as f:
+            json.dump(baseline_lines, f, indent=2)
+
+    return (
+        precision,
+        recall,
+        baseline_lines,
+        target_lines,
+        precision_ocsf,
+        recall_ocsf,
+    )
+
+
 def main():
     # logunit = LogUnit(caller=caller)
     # sep = logunit(sys.argv[1])
     parser = argparse.ArgumentParser(description="Evaluate")
-    parser.add_argument("target", type=str, help="Path to the target parser")
+    parser.add_argument(
+        "target", type=str, nargs="?", help="Path to the target parser"
+    )
     parser.add_argument(
         "--baseline", type=str, help="Path to the baseline parser"
     )
@@ -68,6 +197,16 @@ def main():
         "--config_file", type=str, help="Path to the config file"
     )
     parser.add_argument("--log_file", type=str, help="Path to the log file")
+    parser.add_argument(
+        "--baseline_log_json",
+        type=str,
+        help="Path to baseline parsed log JSON for JSON evaluation mode",
+    )
+    parser.add_argument(
+        "--target_log_json",
+        type=str,
+        help="Path to target parsed log JSON for JSON evaluation mode",
+    )
     parser.add_argument(
         "--output",
         type=str,
@@ -132,7 +271,22 @@ def main():
     # Parse the arguments
     args = parser.parse_args()
 
-    if not args.config_file and not args.baseline and args.stage != "stats":
+    json_mode = bool(args.baseline_log_json or args.target_log_json)
+
+    if json_mode:
+        if not args.baseline_log_json or not args.target_log_json:
+            raise ValueError(
+                "Please provide both --baseline_log_json and --target_log_json"
+            )
+        if args.stage != "end_to_end":
+            raise ValueError(
+                "JSON evaluation mode only supports --stage end_to_end"
+            )
+        if not args.baseline_query_path or not args.target_query_path:
+            raise ValueError(
+                "JSON evaluation mode requires --baseline_query_path and --target_query_path"
+            )
+    elif not args.config_file and not args.baseline and args.stage != "stats":
         raise ValueError(
             "Please provide a config file or a path to a baseline parser"
         )
@@ -152,6 +306,80 @@ def main():
         if not args.baseline_query_path:
             args.baseline_query_path = config["query_path"]
     setup_logger()
+
+    if json_mode:
+        precision, recall, baseline_lines, target_lines, precision_ocsf, recall_ocsf = evaluate_json_logs_end_to_end(
+            baseline_log_path=args.baseline_log_json,
+            target_log_path=args.target_log_json,
+            baseline_query_path=args.baseline_query_path,
+            target_query_paths=args.target_query_path,
+            save_to_file=args.save_to_file,
+        )
+        for key, lines in baseline_lines.items():
+            with open(
+                os.path.join(
+                    os.path.dirname(args.output),
+                    f"baseline_lines_query_{key}.json",
+                ),
+                "w",
+                encoding="utf-8",
+            ) as f:
+                f.write("\n".join(lines))
+        for key, lines in target_lines.items():
+            with open(
+                os.path.join(
+                    os.path.dirname(args.output),
+                    f"target_lines_query_{key}.json",
+                ),
+                "w",
+                encoding="utf-8",
+            ) as f:
+                f.write("\n".join(lines))
+        if not args.raw_results_path:
+            print(
+                f"End-to-End Evaluation Results:\n"
+                f"Precision: {precision:.4f}\n"
+                f"Recall: {recall:.4f}\n"
+                f"Precision (OCSF): {precision_ocsf:.4f}\n"
+                f"Recall (OCSF): {recall_ocsf:.4f}"
+            )
+            with open(args.output, "w", encoding="utf-8") as f:
+                writer = csv.writer(f, delimiter="\t")
+                writer.writerow(["type", "precision", "recall"])
+                writer.writerow(["custom", precision, recall])
+                writer.writerow(["ocsf", precision_ocsf, recall_ocsf])
+        else:
+            precision_substring, recall_substring, substring_lines = (
+                compare_results(baseline_lines, args.raw_results_path)
+            )
+            print(
+                f"End-to-End Evaluation Results:\n"
+                f"Precision: {precision:.4f}\n"
+                f"Recall: {recall:.4f}\n"
+                f"Precision (OCSF): {precision_ocsf:.4f}\n"
+                f"Recall (OCSF): {recall_ocsf:.4f}\n"
+                f"Precision (substring): {precision_substring:.4f}\n"
+                f"Recall (substring): {recall_substring:.4f}"
+            )
+            for key, lines in substring_lines.items():
+                with open(
+                    os.path.join(
+                        os.path.dirname(args.output),
+                        f"substring_lines_query_{key}.json",
+                    ),
+                    "w",
+                    encoding="utf-8",
+                ) as f:
+                    f.write("\n".join(lines))
+            with open(args.output, "w", encoding="utf-8") as f:
+                writer = csv.writer(f, delimiter="\t")
+                writer.writerow(["type", "precision", "recall"])
+                writer.writerow(["custom", precision, recall])
+                writer.writerow(["ocsf", precision_ocsf, recall_ocsf])
+                writer.writerow(
+                    ["substring", precision_substring, recall_substring]
+                )
+        return
 
     # Setup caller and OCSF client
     print("Setting up caller and OCSF client")
@@ -351,3 +579,7 @@ def main():
 
     # Clean up
     del caller
+
+
+if __name__ == "__main__":
+    main()
